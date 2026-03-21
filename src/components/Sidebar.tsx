@@ -60,19 +60,19 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
   };
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-zinc-950 text-white">
+    <div className="flex flex-col h-full bg-white border-r border-border">
       {/* Logo */}
-      <div className="px-6 py-6 border-b border-zinc-800">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center">
-            <Film className="w-5 h-5 text-zinc-950" />
+      <div className="px-5 py-5 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-zinc-900 rounded-md flex items-center justify-center">
+            <Film className="w-4 h-4 text-white" />
           </div>
-          <span className="text-lg font-bold tracking-tight">絵コンテ生成</span>
+          <span className="text-base font-bold tracking-tight text-zinc-900">絵コンテ生成</span>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
         {items.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -84,8 +84,8 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 active
-                  ? "bg-zinc-800 text-white"
-                  : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
+                  ? "bg-zinc-100 text-zinc-900"
+                  : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
               )}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
@@ -94,8 +94,6 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
           );
         })}
       </nav>
-
-      {/* Footer - intentionally empty to match original */}
     </div>
   );
 
@@ -108,7 +106,7 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
 
       {/* Mobile toggle button */}
       <button
-        className="md:hidden fixed top-4 left-4 z-50 p-2 bg-zinc-900 text-white rounded-lg"
+        className="md:hidden fixed top-4 left-4 z-50 p-2 bg-white border border-border text-zinc-700 rounded-lg shadow-sm"
         onClick={() => setMobileOpen(!mobileOpen)}
       >
         {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -118,7 +116,7 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div
-            className="fixed inset-0 bg-black/50"
+            className="fixed inset-0 bg-black/30"
             onClick={() => setMobileOpen(false)}
           />
           <aside className="relative w-60 flex-shrink-0 h-full z-50">

@@ -6,8 +6,8 @@ import Header from "@/components/Header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api, type Project } from "@/lib/api-client";
-import { Plus, Search, ArrowUpDown, Filter, ChevronRight, Loader2, Trash2 } from "lucide-react";
+import { api, type Project, type Client } from "@/lib/api-client";
+import { Plus, Search, ArrowUpDown, Filter, ChevronRight, Loader2, Trash2, X } from "lucide-react";
 import { useUser } from "@/lib/useUser";
 
 interface ProjectsPageProps {
@@ -20,9 +20,14 @@ export default function ProjectsPage({ params }: ProjectsPageProps) {
   const [search, setSearch] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showNewProject, setShowNewProject] = useState(false);
+
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectClientId, setNewProjectClientId] = useState("");
   const [creating, setCreating] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
 
   const loadProjects = async () => {
     try {
@@ -35,6 +40,18 @@ export default function ProjectsPage({ params }: ProjectsPageProps) {
     }
   };
 
+  const loadClients = async () => {
+    setLoadingClients(true);
+    try {
+      const data = await api.listClients(workspaceSlug);
+      setClients(data);
+    } catch {
+      setClients([]);
+    } finally {
+      setLoadingClients(false);
+    }
+  };
+
   useEffect(() => {
     loadProjects();
   }, [workspaceSlug]);
@@ -43,13 +60,24 @@ export default function ProjectsPage({ params }: ProjectsPageProps) {
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const openModal = () => {
+    setShowModal(true);
+    setNewProjectName("");
+    setNewProjectClientId("");
+    loadClients();
+  };
+
   const handleCreate = async () => {
     if (!newProjectName.trim()) return;
     setCreating(true);
     try {
-      await api.createProject(workspaceSlug, { name: newProjectName.trim() });
+      await api.createProject(workspaceSlug, {
+        name: newProjectName.trim(),
+        client_id: newProjectClientId || undefined,
+      });
       setNewProjectName("");
-      setShowNewProject(false);
+      setNewProjectClientId("");
+      setShowModal(false);
       loadProjects();
     } catch {
       alert("作成に失敗しました");
@@ -94,31 +122,11 @@ export default function ProjectsPage({ params }: ProjectsPageProps) {
       <main className="flex-1 overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold">プロジェクト一覧</h1>
-          <Button size="sm" onClick={() => setShowNewProject(true)}>
+          <Button size="sm" onClick={openModal}>
             <Plus className="w-4 h-4" />
             新規プロジェクト追加
           </Button>
         </div>
-
-        {showNewProject && (
-          <div className="mb-4 rounded-xl border border-border bg-card p-4 flex gap-3">
-            <input
-              type="text"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              placeholder="プロジェクト名を入力"
-              className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background"
-              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              autoFocus
-            />
-            <Button size="sm" onClick={handleCreate} disabled={creating}>
-              {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "作成"}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setShowNewProject(false)}>
-              キャンセル
-            </Button>
-          </div>
-        )}
 
         <div className="flex items-center gap-3 mb-6">
           <div className="relative flex-1 max-w-sm">
@@ -194,6 +202,62 @@ export default function ProjectsPage({ params }: ProjectsPageProps) {
         </div>
         <p className="text-xs text-muted-foreground mt-3">{filtered.length}件のプロジェクト</p>
       </main>
+
+      {/* New Project Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/40" onClick={() => setShowModal(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 z-50">
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-4 right-4 p-1 rounded hover:bg-zinc-100 text-zinc-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <h2 className="text-lg font-semibold mb-1">新規プロジェクト</h2>
+            <p className="text-sm text-muted-foreground mb-5">新しいプロジェクトを作成します</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-1.5">プロジェクト名</label>
+                <Input
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="プロジェクト名を入力"
+                  onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-1.5">クライアント（任意）</label>
+                <select
+                  value={newProjectClientId}
+                  onChange={(e) => setNewProjectClientId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background"
+                  disabled={loadingClients}
+                >
+                  <option value="">選択してください</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="outline" onClick={() => setShowModal(false)}>
+                キャンセル
+              </Button>
+              <Button onClick={handleCreate} disabled={creating || !newProjectName.trim()}>
+                {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+                作成
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
