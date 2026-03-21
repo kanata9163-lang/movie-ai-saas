@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { getSupabase, jsonResponse, errorResponse } from '@/lib/api-helpers';
 import { generateSceneImage } from '@/lib/gemini';
 
+export const maxDuration = 60;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; draftSceneId: string } }

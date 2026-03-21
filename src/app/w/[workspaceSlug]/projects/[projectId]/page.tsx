@@ -184,7 +184,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     if (!genTitle.trim()) return;
     setGenerating(true);
     try {
-      await api.generateStoryboard(workspaceSlug, projectId, {
+      const result = await api.generateStoryboard(workspaceSlug, projectId, {
         title: genTitle,
         brief: genBrief || undefined,
         config: {
@@ -196,7 +196,15 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
         },
       });
       setShowGenForm(false);
-      loadStoryboards();
+      // Reload storyboards list
+      await loadStoryboards();
+      // Auto-load the generated draft to display it immediately
+      try {
+        const draft = await api.getDraft(workspaceSlug, result.storyboardId);
+        setDraftDetail(draft);
+      } catch {
+        // If draft loading fails, storyboard list is still updated
+      }
     } catch (e) {
       alert(`絵コンテ生成に失敗しました: ${e instanceof Error ? e.message : ''}`);
     } finally {

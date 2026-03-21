@@ -3,6 +3,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { getSupabase, jsonResponse, errorResponse, getWorkspaceBySlug } from '@/lib/api-helpers';
 import { generateStoryboardScenes, type StoryboardGenerateParams } from '@/lib/gemini';
 
+// Increase timeout for AI generation (Vercel Hobby: max 60s)
+export const maxDuration = 60;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; projectId: string } }
