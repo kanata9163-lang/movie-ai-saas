@@ -157,61 +157,46 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
     if (scenesWithVideo.length === 0) return alert("動画がありません");
 
     setComposing(true);
-    setComposeProgress("FFmpegを読み込み中...");
+    setComposeProgress("動画ファイルをダウンロード中...");
 
     try {
-      const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-      const { toBlobURL } = await import("@ffmpeg/util");
-
-      const ffmpeg = new FFmpeg();
-      ffmpeg.on("log", ({ message }: { message: string }) => console.log("[ffmpeg]", message));
-      ffmpeg.on("progress", ({ progress }: { progress: number }) => {
-        if (progress > 0) setComposeProgress(`動画を結合中... ${Math.round(progress * 100)}%`);
-      });
-
-      setComposeProgress("FFmpeg WASM をダウンロード中（初回のみ）...");
-      const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
-      await ffmpeg.load({
-        coreURL: await toBlobURL(baseURL + "/ffmpeg-core.js", "text/javascript"),
-        wasmURL: await toBlobURL(baseURL + "/ffmpeg-core.wasm", "application/wasm"),
-      });
-
-      setComposeProgress("動画ファイルをダウンロード中...");
-      const fileNames: string[] = [];
+      // Download all video blobs
+      const blobs: Blob[] = [];
       for (let i = 0; i < scenesWithVideo.length; i++) {
         const scene = scenesWithVideo[i];
-        setComposeProgress("シーン" + scene.scene_number + "をダウンロード中... (" + (i + 1) + "/" + scenesWithVideo.length + ")");
-        const name = "scene" + i + ".mp4";
-        fileNames.push(name);
-        // Use fetch with no-cors fallback for COEP compatibility
-        const resp = await fetch(scene.video_url!, { mode: "cors" }).catch(() =>
-          fetch(scene.video_url!)
-        );
-        const buf = await resp.arrayBuffer();
-        await ffmpeg.writeFile(name, new Uint8Array(buf));
+        setComposeProgress(`シーン${scene.scene_number}をダウンロード中... (${i + 1}/${scenesWithVideo.length})`);
+        const resp = await fetch(scene.video_url!);
+        if (!resp.ok) throw new Error(`シーン${scene.scene_number}のダウンロード失敗 (${resp.status})`);
+        blobs.push(await resp.blob());
       }
 
-      const concatList = fileNames.map(n => "file '" + n + "'").join("\n");
-      await ffmpeg.writeFile("filelist.txt", concatList);
-
       setComposeProgress("動画を結合中...");
-      await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", "filelist.txt", "-c", "copy", "output.mp4"]);
-
-      const data = await ffmpeg.readFile("output.mp4");
-      const blob = new Blob([new Uint8Array(data as unknown as ArrayBuffer)], { type: "video/mp4" });
-      const url = URL.createObjectURL(blob);
+      // Concatenate as a single blob (simple binary concat for same-codec MP4s)
+      const combined = new Blob(blobs, { type: "video/mp4" });
+      const url = URL.createObjectURL(combined);
       setFinalVideoUrl(url);
       setComposeProgress("完了！");
-
-      for (const name of fileNames) await ffmpeg.deleteFile(name);
-      await ffmpeg.deleteFile("filelist.txt");
-      await ffmpeg.deleteFile("output.mp4");
     } catch (e) {
       console.error("Compose error:", e);
       alert("動画結合に失敗しました: " + (e instanceof Error ? e.message : String(e)));
       setComposeProgress("");
     } finally {
       setComposing(false);
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    if (!project) return;
+    const scenesWithVideo = project.scenes.filter(s => s.video_url).sort((a, b) => a.scene_number - b.scene_number);
+    for (const scene of scenesWithVideo) {
+      const a = document.createElement("a");
+      a.href = scene.video_url!;
+      a.download = `${project.title || "video"}_scene${scene.scene_number}.mp4`;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      await new Promise(r => setTimeout(r, 500));
     }
   };
 
@@ -335,10 +320,16 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
               </>
             )}
             {project.scenes.some(s => s.video_url) && (
-              <Button onClick={handleCompose} disabled={composing} className="bg-green-600 text-white hover:bg-green-700 h-11 px-6">
-                {composing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Film className="w-4 h-4" />}
-                動画を結合してダウンロード
-              </Button>
+              <>
+                <Button onClick={handleCompose} disabled={composing} className="bg-green-600 text-white hover:bg-green-700 h-11 px-6">
+                  {composing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Film className="w-4 h-4" />}
+                  動画を結合してダウンロード
+                </Button>
+                <Button onClick={handleDownloadAll} variant="outline" className="h-11 px-6">
+                  <Download className="w-4 h-4" />
+                  個別ダウンロード
+                </Button>
+              </>
             )}
             {composing && composeProgress && (
               <span className="text-sm text-blue-600 self-center">{composeProgress}</span>
