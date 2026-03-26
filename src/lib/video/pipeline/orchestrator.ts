@@ -310,21 +310,35 @@ export async function runNarrationGeneration(projectId: string) {
     const { data: scenes } = await supabase.from('video_scenes').select('*').eq('video_project_id', projectId).order('scene_number');
     if (!scenes || scenes.length === 0) throw new Error('No scenes found');
 
-    await Promise.allSettled(
-      scenes.map(async (scene: { id: string; narration_text: string; scene_number: number }) => {
-        if (!scene.narration_text) return;
-        const audioBuffer = await generateNarration(scene.narration_text, gender);
+    // Process sequentially to avoid ElevenLabs rate limits
+    let successCount = 0;
+    for (const scene of scenes) {
+      const narrationText = (scene as { narration_text: string }).narration_text;
+      const sceneNumber = (scene as { scene_number: number }).scene_number;
+      const sceneId = (scene as { id: string }).id;
 
-        const path = `video/${projectId}/audio/${scene.scene_number}.mp3`;
+      if (!narrationText) {
+        await addLog(projectId, `⚠️ シーン${sceneNumber} セリフなし - スキップ`);
+        continue;
+      }
+
+      try {
+        const audioBuffer = await generateNarration(narrationText, gender);
+
+        const path = `video/${projectId}/audio/${sceneNumber}.mp3`;
         await supabase.storage.from('generated-assets').upload(path, audioBuffer, { contentType: 'audio/mpeg', upsert: true });
         const { data: urlData } = supabase.storage.from('generated-assets').getPublicUrl(path);
 
-        await supabase.from('video_scenes').update({ audio_url: urlData.publicUrl, status: 'audio_ready' }).eq('id', scene.id);
-        await addLog(projectId, `シーン${scene.scene_number} ナレーション完了`);
-      })
-    );
+        await supabase.from('video_scenes').update({ audio_url: urlData.publicUrl, status: 'audio_ready' }).eq('id', sceneId);
+        await addLog(projectId, `✅ シーン${sceneNumber} ナレーション完了`);
+        successCount++;
+      } catch (sceneErr) {
+        const msg = sceneErr instanceof Error ? sceneErr.message : 'Unknown error';
+        await addLog(projectId, `❌ シーン${sceneNumber} ナレーション失敗: ${msg}`);
+      }
+    }
 
-    await addLog(projectId, '全ナレーション生成完了');
+    await addLog(projectId, `全ナレーション生成完了（${successCount}/${scenes.length}）`);
     await updateProjectStatus(projectId, 'completed');
     return { success: true };
   } catch (err) {
