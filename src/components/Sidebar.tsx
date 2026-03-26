@@ -12,6 +12,8 @@ import {
   Film,
   Menu,
   X,
+  Video,
+  Clapperboard,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -19,43 +21,47 @@ interface SidebarProps {
   workspaceSlug: string;
 }
 
-const navItems = (slug: string) => [
+interface NavSection {
+  title?: string;
+  items: { label: string; href: string; icon: React.ComponentType<{ className?: string }> }[];
+}
+
+const navSections = (slug: string): NavSection[] => [
   {
-    label: "ダッシュボード",
-    href: `/w/${slug}`,
-    icon: LayoutDashboard,
+    items: [
+      { label: "ダッシュボード", href: `/w/${slug}`, icon: LayoutDashboard },
+      { label: "プロジェクト一覧", href: `/w/${slug}/projects`, icon: FolderOpen },
+    ],
   },
   {
-    label: "プロジェクト一覧",
-    href: `/w/${slug}/projects`,
-    icon: FolderOpen,
+    title: "絵コンテ",
+    items: [
+      { label: "絵コンテ一覧", href: `/w/${slug}/storyboards`, icon: Film },
+    ],
   },
   {
-    label: "スケジュール一覧",
-    href: `/w/${slug}/schedule`,
-    icon: Calendar,
+    title: "動画生成",
+    items: [
+      { label: "動画プロジェクト", href: `/w/${slug}/video`, icon: Video },
+      { label: "新規動画生成", href: `/w/${slug}/video/new`, icon: Clapperboard },
+    ],
   },
   {
-    label: "クライアント情報",
-    href: `/w/${slug}/clients`,
-    icon: Users,
-  },
-  {
-    label: "ファイル",
-    href: `/w/${slug}/assets`,
-    icon: FileText,
+    items: [
+      { label: "スケジュール一覧", href: `/w/${slug}/schedule`, icon: Calendar },
+      { label: "クライアント情報", href: `/w/${slug}/clients`, icon: Users },
+      { label: "ファイル", href: `/w/${slug}/assets`, icon: FileText },
+    ],
   },
 ];
 
 export default function Sidebar({ workspaceSlug }: SidebarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const items = navItems(workspaceSlug);
+  const sections = navSections(workspaceSlug);
 
   const isActive = (href: string) => {
-    if (href === `/w/${workspaceSlug}`) {
-      return pathname === href;
-    }
+    if (href === `/w/${workspaceSlug}`) return pathname === href;
     return pathname.startsWith(href);
   };
 
@@ -67,32 +73,41 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
           <div className="w-8 h-8 bg-zinc-900 rounded-md flex items-center justify-center">
             <Film className="w-4 h-4 text-white" />
           </div>
-          <span className="text-base font-bold tracking-tight text-zinc-900">絵コンテ生成</span>
+          <span className="text-base font-bold tracking-tight text-zinc-900">Video Harness</span>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                active
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-              )}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {sections.map((section, si) => (
+          <div key={si}>
+            {section.title && (
+              <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                {section.title}
+              </p>
+            )}
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    active
+                      ? "bg-zinc-100 text-zinc-900"
+                      : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                  )}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
     </div>
   );

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, type Project, type Client } from "@/lib/api-client";
 import { Plus, Search, ArrowUpDown, Filter, ChevronRight, Loader2, Trash2, X } from "lucide-react";
+import LoadingAnimation from "@/components/LoadingAnimation";
 import { useUser } from "@/lib/useUser";
 
 interface ProjectsPageProps {
@@ -110,7 +111,7 @@ export default function ProjectsPage({ params }: ProjectsPageProps) {
       <>
         <Header title="プロジェクト一覧" userEmail={user?.email} />
         <main className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          <LoadingAnimation message="プロジェクトを読み込み中..." />
         </main>
       </>
     );

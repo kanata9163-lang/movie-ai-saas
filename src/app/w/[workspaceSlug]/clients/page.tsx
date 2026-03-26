@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, type Client } from "@/lib/api-client";
 import { Plus, Users, Loader2, Trash2 } from "lucide-react";
+import LoadingAnimation from "@/components/LoadingAnimation";
 import { useUser } from "@/lib/useUser";
 
 interface ClientsPageProps {
@@ -62,7 +63,7 @@ export default function ClientsPage({ params }: ClientsPageProps) {
       <>
         <Header title="クライアント情報" userEmail={user?.email} />
         <main className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          <LoadingAnimation message="クライアント情報を読み込み中..." />
         </main>
       </>
     );

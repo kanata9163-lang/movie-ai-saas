@@ -225,7 +225,7 @@ export const api = {
   // Milestones
   listMilestones: (slug: string, projectId: string) =>
     fetchAPI<Milestone[]>(`/api/w/${slug}/projects/${projectId}/milestones`),
-  createMilestone: (slug: string, projectId: string, data: { name: string; due_date?: string }) =>
+  createMilestone: (slug: string, projectId: string, data: { name: string; start_date?: string; end_date?: string; due_date?: string; status?: string }) =>
     fetchAPI<Milestone>(`/api/w/${slug}/projects/${projectId}/milestones`, { method: 'POST', body: JSON.stringify(data) }),
   updateMilestone: (slug: string, milestoneId: string, data: Partial<Milestone>) =>
     fetchAPI<Milestone>(`/api/w/${slug}/milestones/${milestoneId}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -245,6 +245,8 @@ export const api = {
     fetchAPI<BudgetItem>(`/api/w/${slug}/budgets/${budgetId}/items`, { method: 'POST', body: JSON.stringify(data) }),
 
   // Storyboards
+  listAllStoryboards: (slug: string) =>
+    fetchAPI<(Storyboard & { project_name: string | null })[]>(`/api/w/${slug}/storyboards`),
   listStoryboards: (slug: string, projectId: string) =>
     fetchAPI<Storyboard[]>(`/api/w/${slug}/projects/${projectId}/storyboards`),
   generateStoryboard: (slug: string, projectId: string, data: Record<string, unknown>) =>
@@ -259,6 +261,8 @@ export const api = {
     fetchAPI<{ image_url: string }>(`/api/w/${slug}/draft-scenes/${sceneId}/image/regenerate`, { method: 'POST' }),
   publishStoryboard: (slug: string, storyboardId: string) =>
     fetchAPI<{ version_id: string; version_number: number }>(`/api/w/${slug}/storyboards/${storyboardId}/publish`, { method: 'POST' }),
+  exportToSheets: (slug: string, storyboardId: string) =>
+    fetchAPI<{ spreadsheetId: string; spreadsheetUrl: string }>(`/api/w/${slug}/storyboards/${storyboardId}/export-sheets`, { method: 'POST' }),
 
   // Documents
   listDocuments: (slug: string, projectId: string) =>
@@ -269,6 +273,23 @@ export const api = {
   // Jobs
   getJob: (slug: string, jobId: string) =>
     fetchAPI<Job>(`/api/w/${slug}/jobs/${jobId}`),
+
+  // Elements (reference images)
+  listElements: (slug: string, projectId: string) =>
+    fetchAPI<Array<{ id: string; project_id: string; name: string; label: string; mime_type: string; image_data: string; created_at: string }>>(
+      `/api/w/${slug}/projects/${projectId}/elements`
+    ),
+  createElement: (slug: string, projectId: string, data: { name: string; label?: string; mime_type: string; image_data: string }) =>
+    fetchAPI<{ id: string }>(`/api/w/${slug}/projects/${projectId}/elements`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteElement: (slug: string, elementId: string) =>
+    fetchAPI<null>(`/api/w/${slug}/elements/${elementId}`, { method: 'DELETE' }),
+
+  // Schedules (all milestones across projects)
+  listAllSchedules: (slug: string) =>
+    fetchAPI<(Milestone & { project_name: string })[]>(`/api/w/${slug}/schedules`),
 
   // Auth
   login: (email: string, password: string) =>

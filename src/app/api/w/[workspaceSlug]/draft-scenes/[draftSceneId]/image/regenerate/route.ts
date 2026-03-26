@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getSupabase, jsonResponse, errorResponse } from '@/lib/api-helpers';
-import { generateSceneImage } from '@/lib/gemini';
+import { generateSceneImage, type ReferenceImage } from '@/lib/gemini';
 
 export const maxDuration = 60;
 
@@ -22,15 +22,50 @@ export async function POST(
   try {
     const { data: draft } = await db
       .from('drafts')
-      .select('generation_config')
+      .select('generation_config, storyboard_id')
       .eq('id', scene.draft_id)
       .single();
 
     const negativePrompt = scene.regen_config_override?.negative_prompt
       || draft?.generation_config?.negative_prompt
       || '';
+    const aspectRatio = draft?.generation_config?.image_aspect || '';
+    const imageStyle = draft?.generation_config?.image_style || '';
 
-    const imageDataUrl = await generateSceneImage(scene.image_prompt, negativePrompt);
+    // Fetch elements from DB
+    let referenceImages: ReferenceImage[] = [];
+    if (draft?.storyboard_id) {
+      const { data: storyboard } = await db
+        .from('storyboards')
+        .select('project_id')
+        .eq('id', draft.storyboard_id)
+        .single();
+
+      if (storyboard?.project_id) {
+        const { data: elements } = await db
+          .from('project_elements')
+          .select('mime_type, image_data')
+          .eq('project_id', storyboard.project_id);
+
+        if (elements && elements.length > 0) {
+          referenceImages = elements.map((el) => {
+            const match = el.image_data.match(/^data:(.*?);base64,(.*)$/);
+            if (match) {
+              return { mimeType: match[1], data: match[2] };
+            }
+            return { mimeType: el.mime_type, data: el.image_data };
+          });
+        }
+      }
+    }
+
+    const imageDataUrl = await generateSceneImage(
+      scene.image_prompt,
+      negativePrompt,
+      aspectRatio,
+      referenceImages,
+      imageStyle
+    );
 
     await db
       .from('draft_scenes')

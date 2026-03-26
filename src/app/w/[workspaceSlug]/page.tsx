@@ -4,6 +4,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Plus, Loader2 } from "lucide-react";
+import LoadingAnimation from "@/components/LoadingAnimation";
 import { api, type DashboardData } from "@/lib/api-client";
 import { useEffect, useState } from "react";
 import { useUser } from "@/lib/useUser";
@@ -61,7 +62,7 @@ export default function DashboardPage({ params }: DashboardPageProps) {
       <>
         <Header title="ダッシュボード" userEmail={user?.email} />
         <main className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          <LoadingAnimation message="ダッシュボードを読み込み中..." />
         </main>
       </>
     );

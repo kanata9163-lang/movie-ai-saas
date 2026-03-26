@@ -14,8 +14,11 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Movie AI SaaS - AI絵コンテ生成・制作進行",
-  description: "AI絵コンテ生成・制作進行SaaS",
+  title: "Video Harness - AI動画制作プラットフォーム",
+  description: "AI絵コンテ生成・動画生成・制作進行プラットフォーム",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
