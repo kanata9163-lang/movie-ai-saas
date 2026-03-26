@@ -341,12 +341,23 @@ export async function runNarrationGeneration(projectId: string) {
       try {
         const audioBuffer = await generateNarration(narrationText, gender);
 
+        // Estimate audio duration from MP3 buffer size
+        // MP3 at ~128kbps: duration ≈ (bytes * 8) / 128000
+        const estimatedDuration = Math.ceil((audioBuffer.length * 8) / 128000);
+        // Runway only supports 5 or 10 seconds
+        const videoDuration = estimatedDuration <= 5 ? 5 : 10;
+
         const path = `video/${projectId}/audio/${sceneNumber}.mp3`;
         await supabase.storage.from('generated-assets').upload(path, audioBuffer, { contentType: 'audio/mpeg', upsert: true });
         const { data: urlData } = supabase.storage.from('generated-assets').getPublicUrl(path);
 
-        await supabase.from('video_scenes').update({ audio_url: urlData.publicUrl, status: 'audio_ready' }).eq('id', sceneId);
-        await addLog(projectId, `✅ シーン${sceneNumber} ナレーション完了`);
+        // Save audio URL and update duration to match audio length
+        await supabase.from('video_scenes').update({
+          audio_url: urlData.publicUrl,
+          duration: videoDuration,
+          status: 'audio_ready',
+        }).eq('id', sceneId);
+        await addLog(projectId, `✅ シーン${sceneNumber} ナレーション完了（音声${estimatedDuration}秒→動画${videoDuration}秒）`);
         successCount++;
       } catch (sceneErr) {
         const msg = sceneErr instanceof Error ? sceneErr.message : 'Unknown error';
@@ -355,7 +366,19 @@ export async function runNarrationGeneration(projectId: string) {
     }
 
     await addLog(projectId, `全ナレーション生成完了（${successCount}/${scenes.length}）`);
-    await updateProjectStatus(projectId, 'completed');
+
+    // Check if video has already been generated
+    const { data: updatedScenes } = await supabase.from('video_scenes').select('video_url').eq('video_project_id', projectId);
+    const hasVideos = updatedScenes?.some((s: { video_url: string | null }) => s.video_url);
+
+    if (hasVideos) {
+      // Video was generated before audio (old flow) - mark complete
+      await updateProjectStatus(projectId, 'completed');
+    } else {
+      // New flow: audio first, then video - go back to images_ready so user can generate video
+      await updateProjectStatus(projectId, 'images_ready');
+      await addLog(projectId, '次のステップ: 音声の長さに合わせて動画を生成します');
+    }
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

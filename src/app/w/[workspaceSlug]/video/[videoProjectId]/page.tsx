@@ -59,8 +59,8 @@ interface VideoProject {
 const WIZARD_STEPS = [
   { key: 'analyze', label: 'URL解析・台本生成', stages: ['pending', 'analyzing', 'scripting', 'script_ready'] },
   { key: 'images', label: '画像生成', stages: ['generating_images', 'images_ready'] },
-  { key: 'video', label: '動画生成', stages: ['generating_video'] },
-  { key: 'audio', label: 'ナレーション・完成', stages: ['generating_audio', 'composing', 'completed'] },
+  { key: 'audio', label: 'ナレーション生成', stages: ['generating_audio'] },
+  { key: 'video', label: '動画生成・完成', stages: ['generating_video', 'composing', 'completed'] },
 ];
 
 function getWizardStep(status: string): number {
@@ -110,11 +110,20 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
         await loadProject();
         if (result.allDone) {
           if (pollingRef.current) clearInterval(pollingRef.current);
-          // Auto-trigger narration generation after all videos complete
-          try {
+          await loadProject();
+          // If audio was already generated (new flow), mark as completed
+          // If not (old flow), auto-trigger narration
+          const projRes = await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}`);
+          const projData = await projRes.json();
+          const hasAudio = projData.data?.scenes?.some((s: { audio_url: string | null }) => s.audio_url);
+          if (hasAudio) {
+            // New flow: audio was done first, now mark completed
+            await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}/complete`, { method: 'POST' });
+          } else {
+            // Old flow: generate audio after video
             await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}/generate-audio`, { method: 'POST' });
-            await loadProject();
-          } catch { /* ignore */ }
+          }
+          await loadProject();
         }
       }, 10000);
       return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
@@ -205,11 +214,17 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
             await ffmpeg.writeFile(audioName, new Uint8Array(audioBuf));
 
             // Merge video + audio for this scene
+            // Use -stream_loop to loop video if audio is longer, then cut to audio length
             setComposeProgress(`シーン${scene.scene_number} 動画+音声合成中...`);
             const mergedName = `m${i}.mp4`;
             await ffmpeg.exec([
-              "-i", videoName, "-i", audioName,
-              "-c:v", "copy", "-c:a", "aac", "-shortest",
+              "-stream_loop", "-1", "-i", videoName,
+              "-i", audioName,
+              "-c:v", "libx264", "-preset", "ultrafast",
+              "-c:a", "aac",
+              "-shortest",
+              "-fflags", "+shortest",
+              "-max_interleave_delta", "100M",
               mergedName
             ]);
             fileNames.push(mergedName);
@@ -380,17 +395,17 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                 画像を生成
               </Button>
             )}
-            {project.status === 'images_ready' && (
-              <>
-                <Button onClick={() => runAction('generate-video')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
-                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                  動画を生成（Runway AI）
-                </Button>
-                <Button onClick={() => runAction('generate-audio')} disabled={actionLoading} variant="outline" className="h-11 px-6">
-                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
-                  ナレーション生成
-                </Button>
-              </>
+            {project.status === 'images_ready' && !project.scenes.some(s => s.audio_url) && (
+              <Button onClick={() => runAction('generate-audio')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
+                ナレーション生成（音声の長さで動画時間を自動調整）
+              </Button>
+            )}
+            {project.status === 'images_ready' && project.scenes.some(s => s.audio_url) && (
+              <Button onClick={() => runAction('generate-video')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                動画を生成（Runway AI）
+              </Button>
             )}
             {project.scenes.some(s => s.video_url) && !project.scenes.some(s => s.audio_url) && project.status !== 'generating_audio' && (
               <Button onClick={() => runAction('generate-audio')} disabled={actionLoading} className="bg-orange-600 text-white hover:bg-orange-700 h-11 px-6">
