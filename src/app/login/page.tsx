@@ -31,7 +31,7 @@ export default function LoginPage() {
       if (!json.ok) {
         throw new Error(json.error?.message || "ログインに失敗しました");
       }
-      const slug = json.data?.workspaceSlug || "demo";
+      const slug = json.data?.workspaceSlug;
       // Check for redirect parameter
       const urlParams = new URLSearchParams(window.location.search);
       const redirect = urlParams.get("redirect");

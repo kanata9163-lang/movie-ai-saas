@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     .select('workspace_id, workspaces(id, slug, name)')
     .eq('user_id', user_id);
 
-  let workspaceSlug = 'demo';
+  let workspaceSlug = '';
 
   if (!memberships || memberships.length === 0) {
     // Look up user info

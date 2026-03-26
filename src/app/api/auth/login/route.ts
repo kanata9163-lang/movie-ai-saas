@@ -32,10 +32,29 @@ export async function POST(request: NextRequest) {
     .select('workspace_id, workspaces(id, slug, name)')
     .eq('user_id', data.user.id);
 
-  let workspaceSlug = 'demo';
+  let workspaceSlug = '';
   if (memberships && memberships.length > 0) {
     const ws = (memberships[0] as Record<string, unknown>).workspaces as { slug: string } | null;
     if (ws) workspaceSlug = ws.slug;
+  }
+
+  // Create workspace for users who don't have one
+  if (!workspaceSlug) {
+    const displayName = data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'user';
+    const slug = displayName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20) || 'workspace';
+    const { data: ws } = await db
+      .from('workspaces')
+      .insert({ name: `${displayName}のワークスペース`, slug })
+      .select()
+      .single();
+    if (ws) {
+      await db.from('workspace_members').insert({
+        workspace_id: ws.id,
+        user_id: data.user.id,
+        role: 'owner',
+      });
+      workspaceSlug = ws.slug;
+    }
   }
 
   const response = NextResponse.json({

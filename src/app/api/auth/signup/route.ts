@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  let workspaceSlug = 'demo';
+  let workspaceSlug = '';
   if (workspace) {
     workspaceSlug = workspace.slug;
     await db.from('workspace_members').insert({

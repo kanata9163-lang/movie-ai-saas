@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     .select('workspace_id, workspaces(id, slug, name)')
     .eq('user_id', data.user.id);
 
-  let workspaceSlug = 'demo';
+  let workspaceSlug = '';
 
   if (!memberships || memberships.length === 0) {
     // Create workspace for new Google user
