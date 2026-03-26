@@ -256,7 +256,11 @@ export async function submitVideoTasks(projectId: string) {
     const scenesWithImages = scenes.filter((s: { image_url: string | null }) => s.image_url);
 
     for (const scene of scenesWithImages) {
-      const taskId = await createVideoFromImage(scene.image_url, scene.image_prompt || '', scene.duration || 5, aspectRatio);
+      // For Runway, use a short motion-focused prompt (max 500 chars)
+      // Strip the long CONSISTENT STYLE prefix used for image generation
+      let videoPrompt = (scene.description || scene.image_prompt || '').replace(/^CONSISTENT STYLE:.*?SCENE:\s*/i, '');
+      videoPrompt = `Smooth cinematic motion, professional quality. ${videoPrompt}`.slice(0, 500);
+      const taskId = await createVideoFromImage(scene.image_url, videoPrompt, scene.duration || 5, aspectRatio);
       await supabase.from('video_scenes').update({ video_task_id: taskId, status: 'video_generating' }).eq('id', scene.id);
       await addLog(projectId, `シーン${scene.scene_number}: タスク送信（ID: ${taskId.slice(0, 8)}...）`);
     }

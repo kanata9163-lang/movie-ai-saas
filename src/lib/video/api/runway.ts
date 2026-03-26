@@ -29,7 +29,7 @@ export async function createVideoFromImage(
     body: JSON.stringify({
       model: 'gen4_turbo',
       promptImage: imageUrl,
-      promptText: prompt || 'Smooth cinematic motion, professional quality',
+      promptText: (prompt || 'Smooth cinematic motion, professional quality').slice(0, 1000),
       ratio,
       duration,
     }),
