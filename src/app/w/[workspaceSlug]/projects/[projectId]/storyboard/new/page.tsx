@@ -281,104 +281,142 @@ export default function StoryboardWizard({ params }: StoryboardWizardProps) {
     setExportingPdf(true);
     try {
       const { default: jsPDF } = await import("jspdf");
+      const html2canvas = (await import("html2canvas")).default;
 
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
-      const margin = 15;
-      const colW = (pageW - margin * 3) / 2;
-      const rowH = (pageH - margin * 2 - 15) / 2;
+
+      // Create off-screen container
+      const container = document.createElement("div");
+      container.style.position = "fixed";
+      container.style.left = "-9999px";
+      container.style.top = "0";
+      document.body.appendChild(container);
+
+      // Helper to render a page div to canvas and add to PDF
+      const renderPage = async (pageDiv: HTMLDivElement, addNewPage: boolean) => {
+        container.innerHTML = ""; // eslint-disable-line no-param-reassign
+        container.appendChild(pageDiv);
+        const canvas = await html2canvas(pageDiv, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+        });
+        if (addNewPage) pdf.addPage();
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
+        pdf.addImage(imgData, "JPEG", 0, 0, pageW, pageH);
+      };
 
       // Title page
-      pdf.setFontSize(24);
-      pdf.text(title || "無題", pageW / 2, pageH / 2 - 10, { align: "center" });
-      pdf.setFontSize(12);
-      pdf.text("Storyboard", pageW / 2, pageH / 2 + 5, { align: "center" });
-      pdf.setFontSize(9);
-      pdf.text(new Date().toLocaleDateString("ja-JP"), pageW / 2, pageH / 2 + 15, { align: "center" });
+      const titlePage = document.createElement("div");
+      titlePage.style.cssText = `width:1122px;height:793px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;background:#fff;`;
+
+      const titleText = document.createElement("div");
+      titleText.style.cssText = `font-size:36px;font-weight:700;color:#18181b;margin-bottom:12px;`;
+      titleText.textContent = title || "無題";
+      titlePage.appendChild(titleText);
+
+      const subtitleText = document.createElement("div");
+      subtitleText.style.cssText = `font-size:16px;color:#71717a;`;
+      subtitleText.textContent = `絵コンテ - ${scenes.length}シーン`;
+      titlePage.appendChild(subtitleText);
+
+      const dateText = document.createElement("div");
+      dateText.style.cssText = `font-size:14px;color:#a1a1aa;margin-top:8px;`;
+      dateText.textContent = new Date().toLocaleDateString("ja-JP");
+      titlePage.appendChild(dateText);
+
+      await renderPage(titlePage, false);
 
       // Scene pages (4 scenes per page)
       for (let i = 0; i < scenes.length; i += 4) {
-        pdf.addPage();
         const pageScenes = scenes.slice(i, i + 4);
+        const pageDiv = document.createElement("div");
+        pageDiv.style.cssText = `width:1122px;height:793px;padding:30px;box-sizing:border-box;font-family:system-ui,-apple-system,sans-serif;background:#fff;`;
 
-        // Page header
-        pdf.setFontSize(8);
-        pdf.setTextColor(150);
-        pdf.text(`${title || "無題"} - Page ${Math.floor(i / 4) + 1}`, margin, 10);
-        pdf.setTextColor(0);
+        // Header
+        const header = document.createElement("div");
+        header.style.cssText = `font-size:11px;color:#a1a1aa;margin-bottom:16px;display:flex;justify-content:space-between;`;
+        const headerLeft = document.createElement("span");
+        headerLeft.textContent = title || "無題";
+        const headerRight = document.createElement("span");
+        headerRight.textContent = `Page ${Math.floor(i / 4) + 1}`;
+        header.appendChild(headerLeft);
+        header.appendChild(headerRight);
+        pageDiv.appendChild(header);
 
-        for (let j = 0; j < pageScenes.length; j++) {
-          const scene = pageScenes[j];
-          const col = j % 2;
-          const row = Math.floor(j / 2);
-          const x = margin + col * (colW + margin);
-          const y = margin + 5 + row * (rowH + 5);
+        // Grid
+        const grid = document.createElement("div");
+        grid.style.cssText = `display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:16px;height:calc(100% - 40px);`;
 
-          // Scene border
-          pdf.setDrawColor(220);
-          pdf.setLineWidth(0.3);
-          pdf.rect(x, y, colW, rowH);
+        for (const scene of pageScenes) {
+          const card = document.createElement("div");
+          card.style.cssText = `border:1px solid #e4e4e7;border-radius:12px;overflow:hidden;display:flex;position:relative;`;
 
           // Scene number badge
-          pdf.setFillColor(37, 99, 235);
-          pdf.circle(x + 6, y + 6, 4, "F");
-          pdf.setFontSize(8);
-          pdf.setTextColor(255);
-          pdf.text(String(scene.scene_order), x + 6, y + 7.5, { align: "center" });
-          pdf.setTextColor(0);
+          const badge = document.createElement("div");
+          badge.style.cssText = `position:absolute;top:8px;left:8px;width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;z-index:1;`;
+          badge.textContent = String(scene.scene_order);
+          card.appendChild(badge);
 
-          // Image area
-          const imgW = colW * 0.45;
-          const imgH = rowH - 10;
+          // Image
+          const imgContainer = document.createElement("div");
+          imgContainer.style.cssText = `width:45%;background:#f4f4f5;display:flex;align-items:center;justify-content:center;flex-shrink:0;`;
           if (scene.image_url) {
-            try {
-              pdf.addImage(scene.image_url, "PNG", x + 2, y + 12, imgW, imgH, undefined, "FAST");
-            } catch {
-              pdf.setFillColor(240, 240, 240);
-              pdf.rect(x + 2, y + 12, imgW, imgH, "F");
-              pdf.setFontSize(7);
-              pdf.text("Image", x + 2 + imgW / 2, y + 12 + imgH / 2, { align: "center" });
-            }
+            const img = document.createElement("img");
+            img.crossOrigin = "anonymous";
+            img.src = scene.image_url;
+            img.style.cssText = `width:100%;height:100%;object-fit:cover;`;
+            imgContainer.appendChild(img);
           } else {
-            pdf.setFillColor(245, 245, 245);
-            pdf.rect(x + 2, y + 12, imgW, imgH, "F");
-            pdf.setFontSize(7);
-            pdf.setTextColor(180);
-            pdf.text("No Image", x + 2 + imgW / 2, y + 12 + imgH / 2, { align: "center" });
-            pdf.setTextColor(0);
+            const noImg = document.createElement("div");
+            noImg.style.cssText = `color:#a1a1aa;font-size:12px;`;
+            noImg.textContent = "No Image";
+            imgContainer.appendChild(noImg);
           }
+          card.appendChild(imgContainer);
 
-          // Text area
-          const textX = x + imgW + 6;
-          const textW = colW - imgW - 10;
-          let textY = y + 14;
+          // Text
+          const textContainer = document.createElement("div");
+          textContainer.style.cssText = `flex:1;padding:12px;overflow:hidden;font-size:11px;line-height:1.5;`;
 
           if (scene.dialogue) {
-            pdf.setFontSize(7);
-            pdf.setTextColor(100);
-            pdf.text("Dialogue:", textX, textY);
-            textY += 4;
-            pdf.setFontSize(8);
-            pdf.setTextColor(0);
-            const lines = pdf.splitTextToSize(scene.dialogue, textW);
-            pdf.text(lines.slice(0, 4), textX, textY);
-            textY += Math.min(lines.length, 4) * 4 + 3;
+            const dialogueBlock = document.createElement("div");
+            dialogueBlock.style.cssText = `margin-bottom:8px;`;
+            const dialogueLabel = document.createElement("div");
+            dialogueLabel.style.cssText = `font-size:9px;color:#71717a;font-weight:600;margin-bottom:3px;`;
+            dialogueLabel.textContent = "セリフ";
+            const dialogueContent = document.createElement("div");
+            dialogueContent.style.cssText = `color:#18181b;`;
+            dialogueContent.textContent = scene.dialogue;
+            dialogueBlock.appendChild(dialogueLabel);
+            dialogueBlock.appendChild(dialogueContent);
+            textContainer.appendChild(dialogueBlock);
           }
-
           if (scene.description) {
-            pdf.setFontSize(7);
-            pdf.setTextColor(100);
-            pdf.text("Description:", textX, textY);
-            textY += 4;
-            pdf.setFontSize(8);
-            pdf.setTextColor(0);
-            const lines = pdf.splitTextToSize(scene.description, textW);
-            pdf.text(lines.slice(0, 5), textX, textY);
+            const descBlock = document.createElement("div");
+            const descLabel = document.createElement("div");
+            descLabel.style.cssText = `font-size:9px;color:#71717a;font-weight:600;margin-bottom:3px;`;
+            descLabel.textContent = "説明";
+            const descContent = document.createElement("div");
+            descContent.style.cssText = `color:#3f3f46;`;
+            descContent.textContent = scene.description;
+            descBlock.appendChild(descLabel);
+            descBlock.appendChild(descContent);
+            textContainer.appendChild(descBlock);
           }
+          card.appendChild(textContainer);
+
+          grid.appendChild(card);
         }
+
+        pageDiv.appendChild(grid);
+        await renderPage(pageDiv, true);
       }
 
+      document.body.removeChild(container);
       pdf.save(`${title || "storyboard"}.pdf`);
     } catch (e) {
       alert(`PDF出力に失敗しました: ${e instanceof Error ? e.message : ""}`);

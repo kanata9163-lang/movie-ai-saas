@@ -51,6 +51,12 @@ export default function StoryboardDetailPage({ params }: StoryboardDetailProps) 
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingSheet, setExportingSheet] = useState(false);
 
+  // Video creation from storyboard
+  const [showVideoCreate, setShowVideoCreate] = useState(false);
+  const [videoAspectRatio, setVideoAspectRatio] = useState("9:16");
+  const [videoVoiceType, setVideoVoiceType] = useState("female");
+  const [creatingVideo, setCreatingVideo] = useState(false);
+
   // Lightbox
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -128,86 +134,130 @@ export default function StoryboardDetailPage({ params }: StoryboardDetailProps) 
     setExportingPdf(true);
     try {
       const { default: jsPDF } = await import("jspdf");
+      const html2canvas = (await import("html2canvas")).default;
+
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
-      const margin = 15;
-      const colW = (pageW - margin * 3) / 2;
-      const rowH = (pageH - margin * 2 - 15) / 2;
+
+      const container = document.createElement("div");
+      container.style.position = "fixed";
+      container.style.left = "-9999px";
+      container.style.top = "0";
+      document.body.appendChild(container);
+
+      const renderPage = async (pageDiv: HTMLDivElement, addNewPage: boolean) => {
+        while (container.firstChild) container.removeChild(container.firstChild);
+        container.appendChild(pageDiv);
+        const canvas = await html2canvas(pageDiv, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+        });
+        if (addNewPage) pdf.addPage();
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
+        pdf.addImage(imgData, "JPEG", 0, 0, pageW, pageH);
+      };
 
       // Title page
-      pdf.setFontSize(24);
-      pdf.text(storyboardTitle || "無題", pageW / 2, pageH / 2 - 10, { align: "center" });
-      pdf.setFontSize(12);
-      pdf.text("Storyboard", pageW / 2, pageH / 2 + 5, { align: "center" });
+      const titlePage = document.createElement("div");
+      titlePage.style.cssText = "width:1122px;height:793px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;background:#fff;";
+      const titleEl = document.createElement("div");
+      titleEl.style.cssText = "font-size:36px;font-weight:700;color:#18181b;margin-bottom:12px;";
+      titleEl.textContent = storyboardTitle || "無題";
+      titlePage.appendChild(titleEl);
+      const subtitleEl = document.createElement("div");
+      subtitleEl.style.cssText = "font-size:16px;color:#71717a;";
+      subtitleEl.textContent = "絵コンテ - " + scenes.length + "シーン";
+      titlePage.appendChild(subtitleEl);
+      const dateEl = document.createElement("div");
+      dateEl.style.cssText = "font-size:14px;color:#a1a1aa;margin-top:8px;";
+      dateEl.textContent = new Date().toLocaleDateString("ja-JP");
+      titlePage.appendChild(dateEl);
+      await renderPage(titlePage, false);
 
+      // Scene pages (4 scenes per page)
       for (let i = 0; i < scenes.length; i += 4) {
-        pdf.addPage();
         const pageScenes = scenes.slice(i, i + 4);
-        pdf.setFontSize(8);
-        pdf.setTextColor(150);
-        pdf.text(`${storyboardTitle || "無題"} - Page ${Math.floor(i / 4) + 1}`, margin, 10);
-        pdf.setTextColor(0);
+        const pageDiv = document.createElement("div");
+        pageDiv.style.cssText = "width:1122px;height:793px;padding:30px;box-sizing:border-box;font-family:system-ui,-apple-system,sans-serif;background:#fff;";
 
-        for (let j = 0; j < pageScenes.length; j++) {
-          const scene = pageScenes[j];
-          const col = j % 2;
-          const row = Math.floor(j / 2);
-          const x = margin + col * (colW + margin);
-          const y = margin + 5 + row * (rowH + 5);
+        const header = document.createElement("div");
+        header.style.cssText = "font-size:11px;color:#a1a1aa;margin-bottom:16px;display:flex;justify-content:space-between;";
+        const headerLeft = document.createElement("span");
+        headerLeft.textContent = storyboardTitle || "無題";
+        const headerRight = document.createElement("span");
+        headerRight.textContent = "Page " + (Math.floor(i / 4) + 1);
+        header.appendChild(headerLeft);
+        header.appendChild(headerRight);
+        pageDiv.appendChild(header);
 
-          pdf.setDrawColor(220);
-          pdf.setLineWidth(0.3);
-          pdf.rect(x, y, colW, rowH);
+        const grid = document.createElement("div");
+        grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:16px;height:calc(100% - 40px);";
 
-          pdf.setFillColor(37, 99, 235);
-          pdf.circle(x + 6, y + 6, 4, "F");
-          pdf.setFontSize(8);
-          pdf.setTextColor(255);
-          pdf.text(String(scene.scene_order), x + 6, y + 7.5, { align: "center" });
-          pdf.setTextColor(0);
+        for (const scene of pageScenes) {
+          const card = document.createElement("div");
+          card.style.cssText = "border:1px solid #e4e4e7;border-radius:12px;overflow:hidden;display:flex;position:relative;";
 
-          const imgW = colW * 0.45;
-          const imgH = rowH - 10;
+          const badge = document.createElement("div");
+          badge.style.cssText = "position:absolute;top:8px;left:8px;width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;z-index:1;";
+          badge.textContent = String(scene.scene_order);
+          card.appendChild(badge);
+
+          const imgContainer = document.createElement("div");
+          imgContainer.style.cssText = "width:45%;background:#f4f4f5;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
           if (scene.image_url) {
-            try {
-              pdf.addImage(scene.image_url, "PNG", x + 2, y + 12, imgW, imgH, undefined, "FAST");
-            } catch {
-              pdf.setFillColor(240, 240, 240);
-              pdf.rect(x + 2, y + 12, imgW, imgH, "F");
-            }
+            const img = document.createElement("img");
+            img.crossOrigin = "anonymous";
+            img.src = scene.image_url;
+            img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+            imgContainer.appendChild(img);
           } else {
-            pdf.setFillColor(245, 245, 245);
-            pdf.rect(x + 2, y + 12, imgW, imgH, "F");
+            const noImg = document.createElement("div");
+            noImg.style.cssText = "color:#a1a1aa;font-size:12px;";
+            noImg.textContent = "No Image";
+            imgContainer.appendChild(noImg);
           }
+          card.appendChild(imgContainer);
 
-          const textX = x + imgW + 6;
-          const textW = colW - imgW - 10;
-          let textY = y + 14;
+          const textContainer = document.createElement("div");
+          textContainer.style.cssText = "flex:1;padding:12px;overflow:hidden;font-size:11px;line-height:1.5;";
 
           if (scene.dialogue) {
-            pdf.setFontSize(7);
-            pdf.setTextColor(100);
-            pdf.text("Dialogue:", textX, textY);
-            textY += 4;
-            pdf.setFontSize(8);
-            pdf.setTextColor(0);
-            const lines = pdf.splitTextToSize(scene.dialogue, textW);
-            pdf.text(lines.slice(0, 4), textX, textY);
-            textY += Math.min(lines.length, 4) * 4 + 3;
+            const dialogueBlock = document.createElement("div");
+            dialogueBlock.style.cssText = "margin-bottom:8px;";
+            const dialogueLabel = document.createElement("div");
+            dialogueLabel.style.cssText = "font-size:9px;color:#71717a;font-weight:600;margin-bottom:3px;";
+            dialogueLabel.textContent = "セリフ";
+            const dialogueVal = document.createElement("div");
+            dialogueVal.style.cssText = "color:#18181b;";
+            dialogueVal.textContent = scene.dialogue;
+            dialogueBlock.appendChild(dialogueLabel);
+            dialogueBlock.appendChild(dialogueVal);
+            textContainer.appendChild(dialogueBlock);
           }
           if (scene.description) {
-            pdf.setFontSize(7);
-            pdf.setTextColor(100);
-            pdf.text("Description:", textX, textY);
-            textY += 4;
-            pdf.setFontSize(8);
-            pdf.setTextColor(0);
-            const lines = pdf.splitTextToSize(scene.description, textW);
-            pdf.text(lines.slice(0, 5), textX, textY);
+            const descBlock = document.createElement("div");
+            const descLabel = document.createElement("div");
+            descLabel.style.cssText = "font-size:9px;color:#71717a;font-weight:600;margin-bottom:3px;";
+            descLabel.textContent = "説明";
+            const descVal = document.createElement("div");
+            descVal.style.cssText = "color:#3f3f46;";
+            descVal.textContent = scene.description;
+            descBlock.appendChild(descLabel);
+            descBlock.appendChild(descVal);
+            textContainer.appendChild(descBlock);
           }
+          card.appendChild(textContainer);
+          grid.appendChild(card);
         }
+
+        pageDiv.appendChild(grid);
+        await renderPage(pageDiv, true);
       }
+
+      document.body.removeChild(container);
       pdf.save(`${storyboardTitle || "storyboard"}.pdf`);
     } catch (e) {
       alert(`PDF出力に失敗しました: ${e instanceof Error ? e.message : ""}`);
@@ -246,6 +296,27 @@ export default function StoryboardDetailPage({ params }: StoryboardDetailProps) 
       alert(`エクスポートに失敗しました: ${e instanceof Error ? e.message : ""}`);
     } finally {
       setExportingSheet(false);
+    }
+  };
+
+  const handleCreateVideo = async () => {
+    setCreatingVideo(true);
+    try {
+      const res = await fetch(`/api/w/${workspaceSlug}/storyboards/${storyboardId}/create-video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voice_type: videoVoiceType, aspect_ratio: videoAspectRatio }),
+      });
+      const json = await res.json();
+      if (json.ok && json.data?.id) {
+        router.push(`/w/${workspaceSlug}/video/${json.data.id}`);
+      } else {
+        alert('動画プロジェクトの作成に失敗しました');
+      }
+    } catch {
+      alert('エラーが発生しました');
+    } finally {
+      setCreatingVideo(false);
     }
   };
 
@@ -313,19 +384,47 @@ export default function StoryboardDetailPage({ params }: StoryboardDetailProps) 
               {publishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               公開する
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-purple-300 text-purple-700 hover:bg-purple-50"
-              onClick={() => {
-                const q = new URLSearchParams();
-                if (storyboardTitle) q.set("title", storyboardTitle);
-                router.push(`/w/${workspaceSlug}/video/new${q.toString() ? `?${q}` : ""}`);
-              }}
-            >
-              <Video className="w-3.5 h-3.5" />
-              動画を作成
-            </Button>
+            <div className="relative">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                onClick={() => setShowVideoCreate(!showVideoCreate)}
+              >
+                <Video className="w-3.5 h-3.5" />
+                動画を作成
+              </Button>
+              {showVideoCreate && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowVideoCreate(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-lg border border-border shadow-lg p-4 min-w-[260px]">
+                    <p className="text-xs font-semibold mb-3">絵コンテから動画を生成</p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[11px] text-zinc-500 block mb-1">アスペクト比</label>
+                        <select value={videoAspectRatio} onChange={e => setVideoAspectRatio(e.target.value)} className="w-full text-sm border border-border rounded-md px-2 py-1.5 bg-background">
+                          <option value="9:16">9:16（縦・TikTok/Shorts）</option>
+                          <option value="16:9">16:9（横・YouTube）</option>
+                          <option value="1:1">1:1（正方形）</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-zinc-500 block mb-1">ナレーション音声</label>
+                        <select value={videoVoiceType} onChange={e => setVideoVoiceType(e.target.value)} className="w-full text-sm border border-border rounded-md px-2 py-1.5 bg-background">
+                          <option value="female">女性</option>
+                          <option value="male">男性</option>
+                        </select>
+                      </div>
+                      <Button size="sm" onClick={handleCreateVideo} disabled={creatingVideo} className="w-full bg-purple-600 text-white hover:bg-purple-700">
+                        {creatingVideo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
+                        動画プロジェクトを作成
+                      </Button>
+                      <p className="text-[10px] text-zinc-400">画像とセリフを引き継いで動画・ナレーションを生成します</p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <ShareButton title={storyboardTitle || "絵コンテ"} text="絵コンテを共有" />
           </div>
         </div>
