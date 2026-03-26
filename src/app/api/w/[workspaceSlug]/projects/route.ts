@@ -15,7 +15,7 @@ export async function GET(
 
   let query = db
     .from('projects')
-    .select('*')
+    .select('id, workspace_id, name, status, overview, client_id, owner_user_id, created_at, updated_at')
     .eq('workspace_id', auth.workspace.id)
     .order('created_at', { ascending: false });
 
@@ -25,7 +25,7 @@ export async function GET(
   const { data, error } = await query;
   if (error) return errorResponse('db_error', error.message, 500);
 
-  return jsonResponse(data);
+  return jsonResponse(data, 200, 15);
 }
 
 export async function POST(

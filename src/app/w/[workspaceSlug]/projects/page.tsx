@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, type Project, type Client } from "@/lib/api-client";
 import { Plus, Search, ArrowUpDown, Filter, ChevronRight, Loader2, Trash2, X } from "lucide-react";
-import LoadingAnimation from "@/components/LoadingAnimation";
+import { TableSkeleton } from "@/components/Skeleton";
 import { useUser } from "@/lib/useUser";
 
 interface ProjectsPageProps {
@@ -110,8 +110,14 @@ export default function ProjectsPage({ params }: ProjectsPageProps) {
     return (
       <>
         <Header title="プロジェクト一覧" userEmail={user?.email} />
-        <main className="flex-1 flex items-center justify-center">
-          <LoadingAnimation message="プロジェクトを読み込み中..." />
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="h-6 w-40 bg-zinc-200 rounded animate-pulse" />
+            <div className="h-8 w-40 bg-zinc-200 rounded animate-pulse" />
+          </div>
+          <div className="rounded-xl border border-border overflow-hidden bg-card p-2">
+            <TableSkeleton rows={6} />
+          </div>
         </main>
       </>
     );

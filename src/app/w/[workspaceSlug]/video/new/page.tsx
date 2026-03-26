@@ -208,7 +208,7 @@ export default function NewVideoPage({ params }: NewVideoProps) {
                 <div className="grid grid-cols-4 gap-3">
                   {refImages.map((img, i) => (
                     <div key={i} className="relative group">
-                      <img src={img.preview} alt={img.name} className="w-full aspect-square object-cover rounded-lg border border-border" />
+                      <img src={img.preview} alt={img.name} className="w-full aspect-square object-cover rounded-lg border border-border" loading="lazy" />
                       <select
                         value={img.imageType}
                         onChange={e => setRefImages(prev => prev.map((ri, j) => j === i ? { ...ri, imageType: e.target.value } : ri))}

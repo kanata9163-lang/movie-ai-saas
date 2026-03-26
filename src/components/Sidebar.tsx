@@ -23,6 +23,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { cachedFetch, invalidateCache } from "@/lib/fetch-cache";
 
 interface SidebarProps {
   workspaceSlug: string;
@@ -92,8 +93,7 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
   const sections = navSections(workspaceSlug);
 
   useEffect(() => {
-    fetch("/api/me/workspaces")
-      .then((res) => res.json())
+    cachedFetch<{ ok: boolean; data?: { items: Workspace[] } }>("/api/me/workspaces", 60000)
       .then((json) => {
         if (json.ok && json.data?.items) {
           setWorkspaces(json.data.items);
@@ -180,6 +180,7 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
                     });
                     const json = await res.json();
                     if (json.ok && json.data?.slug) {
+                      invalidateCache("workspaces");
                       router.push(`/w/${json.data.slug}`);
                     }
                   } catch { /* ignore */ }

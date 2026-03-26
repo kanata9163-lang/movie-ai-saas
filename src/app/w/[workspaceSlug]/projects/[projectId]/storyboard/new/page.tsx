@@ -598,7 +598,7 @@ export default function StoryboardWizard({ params }: StoryboardWizardProps) {
                       <div className="grid grid-cols-4 gap-3">
                         {elements.map((el) => (
                           <div key={el.id} className="relative rounded-lg overflow-hidden border border-border group">
-                            <img src={el.dataUrl} alt={el.name} className="w-full aspect-square object-cover" />
+                            <img src={el.dataUrl} alt={el.name} className="w-full aspect-square object-cover" loading="lazy" />
                             <button onClick={() => handleRemoveElement(el.id)}
                               className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity">
                               <X className="w-3 h-3" />
@@ -692,7 +692,7 @@ export default function StoryboardWizard({ params }: StoryboardWizardProps) {
                         >
                           {scene.image_url ? (
                             <>
-                              <img src={scene.image_url} alt={`Scene ${scene.scene_order}`} className="w-full h-full object-cover" />
+                              <img src={scene.image_url} alt={`Scene ${scene.scene_order}`} className="w-full h-full object-cover" loading="lazy" />
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                                 <Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                               </div>
@@ -758,7 +758,7 @@ export default function StoryboardWizard({ params }: StoryboardWizardProps) {
                       >
                         {scene.image_url ? (
                           <>
-                            <img src={scene.image_url} alt={`Scene ${scene.scene_order}`} className="w-full h-full object-cover" />
+                            <img src={scene.image_url} alt={`Scene ${scene.scene_order}`} className="w-full h-full object-cover" loading="lazy" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
                               <Maximize2 className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>

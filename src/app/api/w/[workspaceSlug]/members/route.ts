@@ -29,7 +29,7 @@ export async function GET(
     });
   }
 
-  return jsonResponse(membersWithEmail);
+  return jsonResponse(membersWithEmail, 200, 60);
 }
 
 export async function DELETE(

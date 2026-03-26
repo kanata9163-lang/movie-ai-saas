@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/useUser";
 import { Plus, Video, Search } from "lucide-react";
 import LinkToProject from "@/components/LinkToProject";
-import LoadingAnimation from "@/components/LoadingAnimation";
+import { CardSkeleton } from "@/components/Skeleton";
 import { STAGE_LABELS, PipelineStage } from "@/lib/video/pipeline/types";
 
 interface VideoListProps {
@@ -77,8 +77,13 @@ export default function VideoListPage({ params }: VideoListProps) {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <LoadingAnimation message="読み込み中..." />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">

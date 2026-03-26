@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { api, type Storyboard } from "@/lib/api-client";
 import { Search, Film, ChevronRight, Wand2 } from "lucide-react";
 import { useUser } from "@/lib/useUser";
-import LoadingAnimation from "@/components/LoadingAnimation";
+import { CardSkeleton } from "@/components/Skeleton";
 
 interface StoryboardsPageProps {
   params: { workspaceSlug: string };
@@ -53,8 +53,15 @@ export default function StoryboardsPage({ params }: StoryboardsPageProps) {
     return (
       <>
         <Header title="絵コンテ一覧" userEmail={user?.email} />
-        <main className="flex-1 flex items-center justify-center">
-          <LoadingAnimation message="絵コンテを読み込み中..." />
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-12">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
         </main>
       </>
     );

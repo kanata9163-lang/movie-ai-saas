@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     role: m.role,
   }));
 
-  return jsonResponse({ items });
+  return jsonResponse({ items }, 200, 60);
 }
 
 export async function POST(request: NextRequest) {

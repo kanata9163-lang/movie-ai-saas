@@ -14,7 +14,7 @@ export async function GET(
 
   let query = db
     .from('clients')
-    .select('*')
+    .select('id, workspace_id, name, notes, website_url, industry, contact_person, contact_email, phone, created_at, updated_at')
     .eq('workspace_id', auth.workspace.id)
     .order('created_at', { ascending: false });
 
@@ -22,7 +22,7 @@ export async function GET(
 
   const { data, error } = await query;
   if (error) return errorResponse('db_error', error.message, 500);
-  return jsonResponse(data);
+  return jsonResponse(data, 200, 30);
 }
 
 export async function POST(

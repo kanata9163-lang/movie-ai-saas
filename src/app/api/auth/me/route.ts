@@ -30,5 +30,9 @@ export async function GET(request: NextRequest) {
       id: data.user.id,
       email: data.user.email,
     },
+  }, {
+    headers: {
+      'Cache-Control': 'private, s-maxage=120, stale-while-revalidate=600',
+    },
   });
 }

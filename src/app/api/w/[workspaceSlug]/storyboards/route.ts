@@ -25,5 +25,5 @@ export async function GET(
     projects: undefined,
   }));
 
-  return jsonResponse(result);
+  return jsonResponse(result, 200, 15);
 }

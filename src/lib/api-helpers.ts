@@ -9,8 +9,12 @@ export function getSupabase() {
   return createServerClient();
 }
 
-export function jsonResponse(data: unknown, status = 200) {
-  return NextResponse.json({ ok: true, data, error: null }, { status });
+export function jsonResponse(data: unknown, status = 200, cacheSeconds?: number) {
+  const headers: Record<string, string> = {};
+  if (cacheSeconds) {
+    headers['Cache-Control'] = `private, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 5}`;
+  }
+  return NextResponse.json({ ok: true, data, error: null }, { status, headers });
 }
 
 export function errorResponse(code: string, message: string, status = 400) {
@@ -24,7 +28,7 @@ export async function getWorkspaceBySlug(slug: string) {
   const db = getSupabase();
   const { data, error } = await db
     .from('workspaces')
-    .select('*')
+    .select('id, name, slug, created_at, updated_at')
     .eq('slug', slug)
     .single();
 
@@ -62,7 +66,7 @@ export async function getWorkspaceWithAuth(
 
   const { data: workspace, error: wsError } = await db
     .from('workspaces')
-    .select('*')
+    .select('id, name, slug, created_at, updated_at')
     .eq('slug', slug)
     .single();
 

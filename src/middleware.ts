@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Pre-compiled set for O(1) lookup
+const PUBLIC_PREFIXES = ['/login', '/signup', '/auth/callback', '/api/auth/login', '/api/auth/signup', '/api/auth/callback', '/api/auth/oauth-complete'];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public paths that don't require auth
-  const publicPaths = ['/login', '/signup', '/auth/callback', '/api/auth/login', '/api/auth/signup', '/api/auth/callback', '/api/auth/oauth-complete'];
-  if (publicPaths.some(p => pathname.startsWith(p))) {
+  if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 

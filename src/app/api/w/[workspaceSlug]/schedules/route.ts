@@ -25,7 +25,7 @@ export async function GET(
   // Get all milestones for all projects in workspace
   const { data: milestones, error } = await db
     .from('milestones')
-    .select('*')
+    .select('id, project_id, name, status, start_date, end_date, due_date, order_index, created_at, updated_at')
     .in('project_id', projectIds)
     .order('start_date', { ascending: true });
 
@@ -38,5 +38,5 @@ export async function GET(
     project_name: projectMap.get(m.project_id) || '',
   }));
 
-  return jsonResponse(result);
+  return jsonResponse(result, 200, 30);
 }

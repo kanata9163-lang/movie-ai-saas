@@ -11,7 +11,7 @@ export async function GET(
   return jsonResponse({
     workspace: auth.workspace,
     role: auth.role,
-  });
+  }, 200, 60);
 }
 
 export async function PATCH(

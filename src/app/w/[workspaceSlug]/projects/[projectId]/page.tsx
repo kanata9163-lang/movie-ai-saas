@@ -332,12 +332,24 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
 
             {/* Project documents section */}
             <section className="rounded-xl border border-border bg-card p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-3">
-                プロジェクト資料
-              </h2>
-              <div className="py-4 text-center text-sm text-muted-foreground">
-                資料はまだありません
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-foreground">
+                  プロジェクト資料
+                </h2>
+                <Link
+                  href={`/w/${workspaceSlug}/projects/${projectId}/documents`}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <BookOpen className="w-3 h-3" />
+                  資料一覧を開く
+                </Link>
               </div>
+              <Link
+                href={`/w/${workspaceSlug}/projects/${projectId}/documents`}
+                className="block py-4 text-center text-sm text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-zinc-50"
+              >
+                資料一覧ページで資料を管理 →
+              </Link>
             </section>
 
             {/* Schedule section */}
@@ -688,10 +700,13 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 <h2 className="text-sm font-semibold text-foreground">
                   予算状況
                 </h2>
-                <button className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+                <Link
+                  href={`/w/${workspaceSlug}/projects/${projectId}/budget`}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+                >
                   詳細
                   <ChevronRight className="w-3 h-3" />
-                </button>
+                </Link>
               </div>
 
               {/* Donut chart */}
@@ -736,21 +751,15 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 </div>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={async () => {
-                  if (!budget) {
-                    await api.createBudget(workspaceSlug, projectId, {
-                      total_budget: 0,
-                    });
-                    loadBudget();
-                  }
-                }}
-              >
-                新規入力
-              </Button>
+              <Link href={`/w/${workspaceSlug}/projects/${projectId}/budget`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
+                  新規入力
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

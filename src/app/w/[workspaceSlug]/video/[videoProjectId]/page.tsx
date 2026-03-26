@@ -454,7 +454,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                               if (idx >= 0) setLightboxIndex(idx);
                             }}
                           >
-                            <img src={scene.image_url} alt="" className="w-full h-full object-cover" />
+                            <img src={scene.image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                               <Maximize2 className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>

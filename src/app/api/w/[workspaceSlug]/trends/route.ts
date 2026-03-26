@@ -17,7 +17,9 @@ export async function GET(req: NextRequest, { params }: { params: { workspaceSlu
     .order('generated_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, data });
+  return NextResponse.json({ ok: true, data }, {
+    headers: { 'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=300' },
+  });
 }
 
 export async function POST(req: NextRequest, { params }: { params: { workspaceSlug: string } }) {
