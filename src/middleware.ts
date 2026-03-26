@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Pre-compiled set for O(1) lookup
-const PUBLIC_PREFIXES = ['/login', '/signup', '/auth/callback', '/api/auth/login', '/api/auth/signup', '/api/auth/callback', '/api/auth/oauth-complete'];
+const PUBLIC_PREFIXES = ['/login', '/signup', '/auth/callback', '/api/auth/login', '/api/auth/signup', '/api/auth/callback', '/api/auth/oauth-complete', '/api/auth/refresh'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

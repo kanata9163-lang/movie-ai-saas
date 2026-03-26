@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { cachedFetch } from "@/lib/fetch-cache";
 
 interface User {
   id: string;
@@ -13,13 +12,19 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    cachedFetch<{ ok: boolean; data?: User }>("/api/auth/me", 120000)
-      .then((json) => {
-        if (json.ok) {
-          setUser(json.data || null);
+    // Don't use cachedFetch for auth - always get fresh data
+    fetch("/api/auth/me")
+      .then(async (res) => {
+        const json = await res.json();
+        if (json.ok && json.data) {
+          setUser(json.data);
+        } else {
+          setUser(null);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setUser(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
