@@ -90,6 +90,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
   const [editFields, setEditFields] = useState<{ narration_text: string; description: string; image_prompt: string; duration: number }>({ narration_text: '', description: '', image_prompt: '', duration: 5 });
   const [savingScene, setSavingScene] = useState(false);
   const [regeneratingScript, setRegeneratingScript] = useState(false);
+  const [regeneratingVideoSceneId, setRegeneratingVideoSceneId] = useState<string | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -208,6 +209,26 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
       await runAction('analyze');
     } catch { alert('再生成に失敗しました'); }
     finally { setRegeneratingScript(false); }
+  };
+
+  const regenerateVideo = async (sceneId: string) => {
+    setRegeneratingVideoSceneId(sceneId);
+    try {
+      const res = await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}/regenerate-video`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sceneId }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(`動画再生成に失敗: ${result.error || '不明なエラー'}`);
+      }
+      await loadProject();
+    } catch {
+      alert('動画再生成に失敗しました');
+    } finally {
+      setRegeneratingVideoSceneId(null);
+    }
   };
 
   const proxyUrl = (sceneId: string, type: 'video' | 'audio' = 'video') =>
@@ -618,7 +639,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                             )}
 
                             {/* Action buttons */}
-                            <div className="flex gap-1.5 pt-1">
+                            <div className="flex flex-wrap gap-1.5 pt-1">
                               {(project.status === 'script_ready' || project.status === 'images_ready') && (
                                 <Button
                                   variant="outline"
@@ -640,7 +661,27 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                                   <RefreshCw className="w-3 h-3" />画像再生成
                                 </Button>
                               )}
+                              {/* Video regeneration for failed or completed scenes */}
+                              {scene.image_url && (scene.status === 'video_failed' || scene.status === 'video_ready') && (
+                                <Button
+                                  variant={scene.status === 'video_failed' ? 'default' : 'outline'}
+                                  size="sm"
+                                  className={`flex-1 text-[10px] h-7 ${scene.status === 'video_failed' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}`}
+                                  onClick={() => regenerateVideo(scene.id)}
+                                  disabled={regeneratingVideoSceneId === scene.id}
+                                >
+                                  {regeneratingVideoSceneId === scene.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                                  動画再生成
+                                </Button>
+                              )}
                             </div>
+                            {/* Failed indicator */}
+                            {scene.status === 'video_failed' && (
+                              <div className="flex items-center gap-1 text-[10px] text-red-600 mt-1">
+                                <AlertCircle className="w-3 h-3" />
+                                動画生成に失敗しました
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
