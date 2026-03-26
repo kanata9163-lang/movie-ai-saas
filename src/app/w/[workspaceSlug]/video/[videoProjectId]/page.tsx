@@ -91,6 +91,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
   const [savingScene, setSavingScene] = useState(false);
   const [regeneratingScript, setRegeneratingScript] = useState(false);
   const [regeneratingVideoSceneId, setRegeneratingVideoSceneId] = useState<string | null>(null);
+  const [regeneratingAudioSceneId, setRegeneratingAudioSceneId] = useState<string | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -209,6 +210,26 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
       await runAction('analyze');
     } catch { alert('再生成に失敗しました'); }
     finally { setRegeneratingScript(false); }
+  };
+
+  const regenerateAudio = async (sceneId: string) => {
+    setRegeneratingAudioSceneId(sceneId);
+    try {
+      const res = await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}/regenerate-audio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sceneId }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(`音声再生成に失敗: ${result.error || '不明なエラー'}`);
+      }
+      await loadProject();
+    } catch {
+      alert('音声再生成に失敗しました');
+    } finally {
+      setRegeneratingAudioSceneId(null);
+    }
   };
 
   const regenerateVideo = async (sceneId: string) => {
@@ -721,6 +742,19 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                                   disabled={actionLoading}
                                 >
                                   <RefreshCw className="w-3 h-3" />画像再生成
+                                </Button>
+                              )}
+                              {/* Audio regeneration */}
+                              {scene.narration_text && scene.audio_url && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex-1 text-[10px] h-7"
+                                  onClick={() => regenerateAudio(scene.id)}
+                                  disabled={regeneratingAudioSceneId === scene.id}
+                                >
+                                  {regeneratingAudioSceneId === scene.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Volume2 className="w-3 h-3" />}
+                                  音声再生成
                                 </Button>
                               )}
                               {/* Video regeneration for failed or completed scenes */}
