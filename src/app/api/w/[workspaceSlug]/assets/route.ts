@@ -9,18 +9,12 @@ export async function GET(
   if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
   const db = getSupabase();
-  const url = new URL(request.url);
-  const q = url.searchParams.get('q');
-
-  let query = db
-    .from('clients')
+  const { data, error } = await db
+    .from('assets')
     .select('*')
     .eq('workspace_id', auth.workspace.id)
     .order('created_at', { ascending: false });
 
-  if (q) query = query.ilike('name', `%${q}%`);
-
-  const { data, error } = await query;
   if (error) return errorResponse('db_error', error.message, 500);
   return jsonResponse(data);
 }
@@ -32,21 +26,38 @@ export async function POST(
   const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
   if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
+  const formData = await request.formData();
+  const file = formData.get('file') as File | null;
+  if (!file) return errorResponse('validation', 'file is required');
+
   const db = getSupabase();
-  const body = await request.json();
-  if (!body.name) return errorResponse('validation', 'name is required');
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+
+  const path = `${auth.workspace.id}/${Date.now()}_${file.name}`;
+
+  const { error: uploadError } = await db.storage
+    .from('assets')
+    .upload(path, buffer, { contentType: file.type });
+
+  if (uploadError) {
+    // Try creating the bucket if it doesn't exist
+    await db.storage.createBucket('assets', { public: false });
+    const { error: retryError } = await db.storage
+      .from('assets')
+      .upload(path, buffer, { contentType: file.type });
+    if (retryError) return errorResponse('storage_error', retryError.message, 500);
+  }
 
   const { data, error } = await db
-    .from('clients')
+    .from('assets')
     .insert({
       workspace_id: auth.workspace.id,
-      name: body.name,
-      notes: body.notes || null,
-      website_url: body.website_url || null,
-      industry: body.industry || null,
-      contact_person: body.contact_person || null,
-      contact_email: body.contact_email || null,
-      phone: body.phone || null,
+      file_name: file.name,
+      mime_type: file.type,
+      size_bytes: file.size,
+      storage_path: path,
+      type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'document',
     })
     .select()
     .single();

@@ -20,6 +20,7 @@ import {
   Settings,
   ChevronDown,
   Check,
+  Plus,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -166,6 +167,29 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
                 ワークスペースがありません
               </div>
             )}
+            <div className="border-t border-border mt-1 pt-1">
+              <button
+                onClick={async () => {
+                  const name = prompt("ワークスペース名を入力");
+                  if (!name?.trim()) return;
+                  try {
+                    const res = await fetch("/api/me/workspaces", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ name: name.trim() }),
+                    });
+                    const json = await res.json();
+                    if (json.ok && json.data?.slug) {
+                      router.push(`/w/${json.data.slug}`);
+                    }
+                  } catch { /* ignore */ }
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-500 hover:text-zinc-700 hover:bg-zinc-50 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                新しいワークスペース
+              </button>
+            </div>
           </div>
         )}
       </div>

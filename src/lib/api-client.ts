@@ -48,6 +48,11 @@ export interface Client {
   workspace_id: string;
   name: string;
   notes: string | null;
+  website_url: string | null;
+  industry: string | null;
+  contact_person: string | null;
+  contact_email: string | null;
+  phone: string | null;
   created_at: string;
   updated_at: string;
 }

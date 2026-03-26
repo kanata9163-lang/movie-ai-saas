@@ -15,6 +15,7 @@ import {
   Download,
   Maximize2,
   FileSpreadsheet,
+  Video,
 } from "lucide-react";
 import { useUser } from "@/lib/useUser";
 import { Badge } from "@/components/ui/badge";
@@ -310,6 +311,19 @@ export default function StoryboardDetailPage({ params }: StoryboardDetailProps) 
             <Button size="sm" onClick={handlePublish} disabled={publishing} className="bg-zinc-900 text-white hover:bg-zinc-800">
               {publishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               公開する
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-purple-300 text-purple-700 hover:bg-purple-50"
+              onClick={() => {
+                const q = new URLSearchParams();
+                if (storyboardTitle) q.set("title", storyboardTitle);
+                router.push(`/w/${workspaceSlug}/video/new${q.toString() ? `?${q}` : ""}`);
+              }}
+            >
+              <Video className="w-3.5 h-3.5" />
+              動画を作成
             </Button>
           </div>
         </div>

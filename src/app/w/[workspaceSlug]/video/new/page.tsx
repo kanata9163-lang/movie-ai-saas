@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/useUser";
-import { Loader2, Upload, X, Link as LinkIcon } from "lucide-react";
+import { Loader2, Upload, X, Link as LinkIcon, Users } from "lucide-react";
 
 interface NewVideoProps {
   params: { workspaceSlug: string };
@@ -18,18 +18,46 @@ interface RefImage {
   name: string;
 }
 
+interface ClientOption {
+  id: string;
+  name: string;
+  website_url?: string;
+}
+
 export default function NewVideoPage({ params }: NewVideoProps) {
   const { workspaceSlug } = params;
   const { user } = useUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [title, setTitle] = useState("");
-  const [sourceUrl, setSourceUrl] = useState("");
+  const [title, setTitle] = useState(searchParams.get("title") || "");
+  const [sourceUrl, setSourceUrl] = useState(searchParams.get("url") || "");
   const [aspectRatio, setAspectRatio] = useState("9:16");
   const [voiceType, setVoiceType] = useState("female");
   const [refImages, setRefImages] = useState<RefImage[]>([]);
   const [creating, setCreating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Client selection
+  const [clients, setClients] = useState<ClientOption[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
+
+  useEffect(() => {
+    fetch(`/api/w/${workspaceSlug}/clients`)
+      .then(r => r.json())
+      .then(res => {
+        if (res.ok) setClients(res.data || []);
+      })
+      .catch(() => {});
+  }, [workspaceSlug]);
+
+  const handleClientChange = (clientId: string) => {
+    setSelectedClientId(clientId);
+    const client = clients.find(c => c.id === clientId);
+    if (client?.website_url && !sourceUrl) {
+      setSourceUrl(client.website_url);
+    }
+  };
 
   const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,6 +114,29 @@ export default function NewVideoPage({ params }: NewVideoProps) {
           <h1 className="text-xl font-bold mb-6">新規動画プロジェクト</h1>
 
           <div className="space-y-5">
+            {/* Client Selection */}
+            {clients.length > 0 && (
+              <div>
+                <label className="text-sm font-medium block mb-1.5 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  クライアント（任意）
+                </label>
+                <select
+                  value={selectedClientId}
+                  onChange={e => handleClientChange(e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-lg bg-background"
+                >
+                  <option value="">クライアントを選択...</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.website_url ? ` (${c.website_url})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground mt-1">クライアントを選択すると、URLが自動入力されます</p>
+              </div>
+            )}
+
             {/* URL */}
             <div>
               <label className="text-sm font-medium block mb-1.5">参照URL <span className="text-red-500">*</span></label>
