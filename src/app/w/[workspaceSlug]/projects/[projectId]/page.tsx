@@ -24,6 +24,10 @@ import {
   ChevronRight,
   X,
   Wand2,
+  Video,
+  Megaphone,
+  TrendingUp,
+  BookOpen,
 } from "lucide-react";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import Link from "next/link";
@@ -65,6 +69,15 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   // Storyboard
   const [storyboards, setStoryboards] = useState<Storyboard[]>([]);
 
+  // Linked resources
+  interface LinkedResources {
+    adAnalyses: Array<{ id: string; query: string; platform: string; created_at: string }>;
+    trendReports: Array<{ id: string; topic: string; platform: string; created_at: string }>;
+    knowledgeItems: Array<{ id: string; title: string; type: string; created_at: string }>;
+    videoProjects: Array<{ id: string; title: string; status: string; created_at: string }>;
+  }
+  const [linkedResources, setLinkedResources] = useState<LinkedResources | null>(null);
+
   useEffect(() => {
     loadAll();
   }, [workspaceSlug, projectId]);
@@ -87,6 +100,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       loadMilestones(),
       loadBudget(),
       loadStoryboards(),
+      loadLinkedResources(),
     ]).catch(() => {});
   };
 
@@ -127,6 +141,16 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       setStoryboards(data);
     } catch {
       setStoryboards([]);
+    }
+  };
+
+  const loadLinkedResources = async () => {
+    try {
+      const res = await fetch(`/api/w/${workspaceSlug}/projects/${projectId}/linked-resources`);
+      const json = await res.json();
+      if (json.ok) setLinkedResources(json.data);
+    } catch {
+      // ignore
     }
   };
 
@@ -527,6 +551,133 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 </div>
               )}
             </section>
+
+            {/* Linked Resources */}
+            {linkedResources && (
+              <>
+                {/* Video Projects */}
+                {linkedResources.videoProjects.length > 0 && (
+                  <section className="rounded-xl border border-border bg-card p-5">
+                    <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <Video className="w-4 h-4 text-zinc-500" />
+                      動画プロジェクト
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {linkedResources.videoProjects.length}件
+                      </span>
+                    </h2>
+                    <div className="space-y-2">
+                      {linkedResources.videoProjects.map((vp) => (
+                        <Link
+                          key={vp.id}
+                          href={`/w/${workspaceSlug}/video/${vp.id}`}
+                          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-zinc-50 transition-colors"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{vp.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(vp.created_at).toLocaleDateString("ja-JP")}
+                            </p>
+                          </div>
+                          <Badge variant={vp.status === 'completed' ? 'green' : 'default'} className="text-[10px]">
+                            {vp.status === 'completed' ? '完了' : vp.status}
+                          </Badge>
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Ad Analyses */}
+                {linkedResources.adAnalyses.length > 0 && (
+                  <section className="rounded-xl border border-border bg-card p-5">
+                    <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <Megaphone className="w-4 h-4 text-zinc-500" />
+                      広告分析
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {linkedResources.adAnalyses.length}件
+                      </span>
+                    </h2>
+                    <div className="space-y-2">
+                      {linkedResources.adAnalyses.map((ad) => (
+                        <Link
+                          key={ad.id}
+                          href={`/w/${workspaceSlug}/ad-research`}
+                          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-zinc-50 transition-colors"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{ad.query}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {ad.platform} - {new Date(ad.created_at).toLocaleDateString("ja-JP")}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-zinc-400" />
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Trend Reports */}
+                {linkedResources.trendReports.length > 0 && (
+                  <section className="rounded-xl border border-border bg-card p-5">
+                    <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-zinc-500" />
+                      トレンドリサーチ
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {linkedResources.trendReports.length}件
+                      </span>
+                    </h2>
+                    <div className="space-y-2">
+                      {linkedResources.trendReports.map((tr) => (
+                        <Link
+                          key={tr.id}
+                          href={`/w/${workspaceSlug}/trends`}
+                          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-zinc-50 transition-colors"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{tr.topic}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {tr.platform} - {new Date(tr.created_at).toLocaleDateString("ja-JP")}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-zinc-400" />
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Knowledge Items */}
+                {linkedResources.knowledgeItems.length > 0 && (
+                  <section className="rounded-xl border border-border bg-card p-5">
+                    <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-zinc-500" />
+                      ナレッジ
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {linkedResources.knowledgeItems.length}件
+                      </span>
+                    </h2>
+                    <div className="space-y-2">
+                      {linkedResources.knowledgeItems.map((ki) => (
+                        <Link
+                          key={ki.id}
+                          href={`/w/${workspaceSlug}/knowledge`}
+                          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-zinc-50 transition-colors"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{ki.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {ki.type} - {new Date(ki.created_at).toLocaleDateString("ja-JP")}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-zinc-400" />
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </>
+            )}
           </div>
 
           {/* Right sidebar */}

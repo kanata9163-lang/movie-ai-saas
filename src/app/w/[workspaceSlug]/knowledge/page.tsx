@@ -19,6 +19,7 @@ import {
   Loader2,
   Tag,
 } from "lucide-react";
+import LinkToProject from "@/components/LinkToProject";
 
 interface KnowledgePageProps {
   params: { workspaceSlug: string };
@@ -260,8 +261,16 @@ export default function KnowledgePage({ params }: KnowledgePageProps) {
                     ))}
                   </div>
                 )}
-                <div className="text-[10px] text-muted-foreground">
-                  {new Date(item.created_at).toLocaleDateString("ja-JP")}
+                <div className="flex items-center justify-between mt-1">
+                  <div className="text-[10px] text-muted-foreground">
+                    {new Date(item.created_at).toLocaleDateString("ja-JP")}
+                  </div>
+                  <LinkToProject
+                    workspaceSlug={workspaceSlug}
+                    resourceType="knowledge_item"
+                    resourceId={item.id}
+                    compact
+                  />
                 </div>
               </div>
             ))}

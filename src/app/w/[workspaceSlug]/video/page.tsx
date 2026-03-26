@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/useUser";
 import { Plus, Video, Search } from "lucide-react";
+import LinkToProject from "@/components/LinkToProject";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import { STAGE_LABELS, PipelineStage } from "@/lib/video/pipeline/types";
 
@@ -19,6 +20,7 @@ interface VideoProject {
   status: string;
   source_url: string;
   aspect_ratio: string;
+  project_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -105,9 +107,17 @@ export default function VideoListPage({ params }: VideoListProps) {
                   {p.source_url && (
                     <p className="text-xs text-muted-foreground truncate mb-2">{p.source_url}</p>
                   )}
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{p.aspect_ratio}</span>
-                    <span>{new Date(p.created_at).toLocaleDateString('ja-JP')}</span>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+                    <span>{p.aspect_ratio} - {new Date(p.created_at).toLocaleDateString('ja-JP')}</span>
+                    <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                      <LinkToProject
+                        workspaceSlug={workspaceSlug}
+                        resourceType="video_project"
+                        resourceId={p.id}
+                        currentProjectId={p.project_id}
+                        compact
+                      />
+                    </div>
                   </div>
                 </div>
               </Link>

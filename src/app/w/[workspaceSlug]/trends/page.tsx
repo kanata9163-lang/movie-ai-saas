@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Clapperboard,
 } from "lucide-react";
+import LinkToProject from "@/components/LinkToProject";
 
 interface TrendsPageProps {
   params: { workspaceSlug: string };
@@ -164,18 +165,28 @@ export default function TrendsPage({ params }: TrendsPageProps) {
                     onClick={() => setExpandedId(expanded ? null : report.id)}
                     className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-50 transition-colors text-left"
                   >
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-sm">{report.topic}</h3>
-                        {report.platform && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-                            {report.platform}
-                          </span>
-                        )}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-sm">{report.topic}</h3>
+                          {report.platform && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                              {report.platform}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(report.generated_at).toLocaleDateString("ja-JP")} - {rc.summary?.slice(0, 80)}...
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(report.generated_at).toLocaleDateString("ja-JP")} - {rc.summary?.slice(0, 80)}...
-                      </p>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <LinkToProject
+                          workspaceSlug={workspaceSlug}
+                          resourceType="trend_report"
+                          resourceId={report.id}
+                          compact
+                        />
+                      </div>
                     </div>
                     {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                   </button>
