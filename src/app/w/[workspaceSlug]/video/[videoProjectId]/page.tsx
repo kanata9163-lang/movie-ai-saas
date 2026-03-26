@@ -110,6 +110,11 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
         await loadProject();
         if (result.allDone) {
           if (pollingRef.current) clearInterval(pollingRef.current);
+          // Auto-trigger narration generation after all videos complete
+          try {
+            await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}/generate-audio`, { method: 'POST' });
+            await loadProject();
+          } catch { /* ignore */ }
         }
       }, 10000);
       return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
@@ -386,6 +391,12 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                   ナレーション生成
                 </Button>
               </>
+            )}
+            {project.scenes.some(s => s.video_url) && !project.scenes.some(s => s.audio_url) && project.status !== 'generating_audio' && (
+              <Button onClick={() => runAction('generate-audio')} disabled={actionLoading} className="bg-orange-600 text-white hover:bg-orange-700 h-11 px-6">
+                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
+                ナレーション生成
+              </Button>
             )}
             {project.scenes.some(s => s.video_url) && (
               <>
