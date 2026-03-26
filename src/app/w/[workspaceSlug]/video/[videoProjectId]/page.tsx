@@ -25,6 +25,7 @@ import {
   Pencil,
   Save,
   RotateCcw,
+  Music,
 } from "lucide-react";
 import ShareButton from "@/components/ShareButton";
 
@@ -92,6 +93,8 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
   const [regeneratingScript, setRegeneratingScript] = useState(false);
   const [regeneratingVideoSceneId, setRegeneratingVideoSceneId] = useState<string | null>(null);
   const [regeneratingAudioSceneId, setRegeneratingAudioSceneId] = useState<string | null>(null);
+  const [generatingBGM, setGeneratingBGM] = useState(false);
+  const [bgmUrl, setBgmUrl] = useState<string | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -328,10 +331,44 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
       await ffmpeg.writeFile("filelist.txt", concatList);
       await ffmpeg.exec([
         "-f", "concat", "-safe", "0", "-i", "filelist.txt",
-        "-c", "copy", "output.mp4"
+        "-c", "copy", "concat.mp4"
       ]);
 
-      const data = await ffmpeg.readFile("output.mp4");
+      // Mix BGM if available
+      let finalFile = "concat.mp4";
+      if (bgmUrl) {
+        try {
+          setComposeProgress("BGMをダウンロード中...");
+          const bgmResp = await fetch(bgmUrl);
+          if (bgmResp.ok) {
+            const bgmBuf = await bgmResp.arrayBuffer();
+            await ffmpeg.writeFile("bgm.mp3", new Uint8Array(bgmBuf));
+
+            setComposeProgress("BGMをミックス中...");
+            // Mix: loop BGM to match video length, lower BGM volume to -18dB (0.125x)
+            // Keep narration at full volume, blend BGM underneath
+            await ffmpeg.exec([
+              "-i", "concat.mp4",
+              "-stream_loop", "-1", "-i", "bgm.mp3",
+              "-filter_complex",
+              "[0:a]volume=1.0[narration];[1:a]volume=0.12[bgm];[narration][bgm]amix=inputs=2:duration=first:dropout_transition=3[aout]",
+              "-map", "0:v",
+              "-map", "[aout]",
+              "-c:v", "copy",
+              "-c:a", "aac",
+              "-shortest",
+              "final_with_bgm.mp4"
+            ]);
+            finalFile = "final_with_bgm.mp4";
+            await ffmpeg.deleteFile("bgm.mp3").catch(() => {});
+          }
+        } catch (bgmErr) {
+          console.warn("BGM mix failed, using video without BGM:", bgmErr);
+          // Continue with concat.mp4 without BGM
+        }
+      }
+
+      const data = await ffmpeg.readFile(finalFile);
       const blob = new Blob([new Uint8Array(data as unknown as ArrayBuffer)], { type: "video/mp4" });
       const url = URL.createObjectURL(blob);
       setFinalVideoUrl(url);
@@ -340,13 +377,34 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
       // Cleanup
       for (const name of fileNames) await ffmpeg.deleteFile(name).catch(() => {});
       await ffmpeg.deleteFile("filelist.txt").catch(() => {});
-      await ffmpeg.deleteFile("output.mp4").catch(() => {});
+      await ffmpeg.deleteFile("concat.mp4").catch(() => {});
+      await ffmpeg.deleteFile("final_with_bgm.mp4").catch(() => {});
     } catch (e) {
       console.error("Compose error:", e);
       alert("動画結合に失敗しました: " + (e instanceof Error ? e.message : String(e)));
       setComposeProgress("");
     } finally {
       setComposing(false);
+    }
+  };
+
+  const handleGenerateBGM = async () => {
+    setGeneratingBGM(true);
+    try {
+      const res = await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}/generate-bgm`, {
+        method: 'POST',
+      });
+      const result = await res.json();
+      if (result.ok && result.bgmUrl) {
+        setBgmUrl(result.bgmUrl);
+        await loadProject();
+      } else {
+        alert(`BGM生成に失敗: ${result.error || '不明なエラー'}`);
+      }
+    } catch {
+      alert('BGM生成に失敗しました');
+    } finally {
+      setGeneratingBGM(false);
     }
   };
 
@@ -569,15 +627,26 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
             )}
             {project.scenes.some(s => s.video_url) && (
               <>
+                <Button onClick={handleGenerateBGM} disabled={generatingBGM} className="bg-purple-600 text-white hover:bg-purple-700 h-11 px-6">
+                  {generatingBGM ? <Loader2 className="w-4 h-4 animate-spin" /> : <Music className="w-4 h-4" />}
+                  {bgmUrl ? 'BGMを再生成' : 'BGMを生成'}（Gemini AI）
+                </Button>
                 <Button onClick={handleCompose} disabled={composing} className="bg-green-600 text-white hover:bg-green-700 h-11 px-6">
                   {composing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Film className="w-4 h-4" />}
-                  動画を結合してダウンロード
+                  {bgmUrl ? '動画を結合+BGMミックス' : '動画を結合してダウンロード'}
                 </Button>
                 <Button onClick={handleDownloadAll} variant="outline" className="h-11 px-6">
                   <Download className="w-4 h-4" />
                   個別ダウンロード
                 </Button>
               </>
+            )}
+            {bgmUrl && (
+              <div className="w-full flex items-center gap-3 mt-1">
+                <Music className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                <span className="text-xs text-purple-700 font-medium">BGM生成済み</span>
+                <audio src={bgmUrl} controls className="h-8 flex-1" />
+              </div>
             )}
             {composing && composeProgress && (
               <span className="text-sm text-blue-600 self-center">{composeProgress}</span>
