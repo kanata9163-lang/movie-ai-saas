@@ -160,23 +160,80 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
     if (scenesWithVideo.length === 0) return alert("動画がありません");
 
     setComposing(true);
-    setComposeProgress("動画ファイルをダウンロード中...");
 
     try {
-      const blobs: Blob[] = [];
+      setComposeProgress("FFmpegを読み込み中...");
+      const { FFmpeg } = await import("@ffmpeg/ffmpeg");
+      const ffmpeg = new FFmpeg();
+      ffmpeg.on("log", ({ message }: { message: string }) => console.log("[ffmpeg]", message));
+      ffmpeg.on("progress", ({ progress }: { progress: number }) => {
+        if (progress > 0) setComposeProgress(`処理中... ${Math.round(progress * 100)}%`);
+      });
+
+      // Load single-threaded core (no SharedArrayBuffer needed)
+      setComposeProgress("FFmpeg WASM をダウンロード中（初回のみ）...");
+      const coreBase = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+      await ffmpeg.load({
+        coreURL: coreBase + "/ffmpeg-core.js",
+        wasmURL: coreBase + "/ffmpeg-core.wasm",
+      });
+
+      // Download videos via proxy
+      const fileNames: string[] = [];
       for (let i = 0; i < scenesWithVideo.length; i++) {
         const scene = scenesWithVideo[i];
-        setComposeProgress(`シーン${scene.scene_number}をダウンロード中... (${i + 1}/${scenesWithVideo.length})`);
+        setComposeProgress(`シーン${scene.scene_number} 動画DL中... (${i + 1}/${scenesWithVideo.length})`);
         const resp = await fetch(proxyUrl(scene.id));
-        if (!resp.ok) throw new Error(`シーン${scene.scene_number}のダウンロード失敗 (${resp.status})`);
-        blobs.push(await resp.blob());
+        if (!resp.ok) throw new Error(`シーン${scene.scene_number}のDL失敗`);
+        const buf = await resp.arrayBuffer();
+        const videoName = `v${i}.mp4`;
+        await ffmpeg.writeFile(videoName, new Uint8Array(buf));
+
+        // Download audio if available
+        if (scene.audio_url) {
+          setComposeProgress(`シーン${scene.scene_number} 音声DL中...`);
+          const audioResp = await fetch(proxyUrl(scene.id, 'audio'));
+          if (audioResp.ok) {
+            const audioBuf = await audioResp.arrayBuffer();
+            const audioName = `a${i}.mp3`;
+            await ffmpeg.writeFile(audioName, new Uint8Array(audioBuf));
+
+            // Merge video + audio for this scene
+            setComposeProgress(`シーン${scene.scene_number} 動画+音声合成中...`);
+            const mergedName = `m${i}.mp4`;
+            await ffmpeg.exec([
+              "-i", videoName, "-i", audioName,
+              "-c:v", "copy", "-c:a", "aac", "-shortest",
+              mergedName
+            ]);
+            fileNames.push(mergedName);
+          } else {
+            fileNames.push(videoName);
+          }
+        } else {
+          fileNames.push(videoName);
+        }
       }
 
-      setComposeProgress("動画を結合中...");
-      const combined = new Blob(blobs, { type: "video/mp4" });
-      const url = URL.createObjectURL(combined);
+      // Concatenate all scenes
+      setComposeProgress("全シーンを結合中...");
+      const concatList = fileNames.map(n => `file '${n}'`).join("\n");
+      await ffmpeg.writeFile("filelist.txt", concatList);
+      await ffmpeg.exec([
+        "-f", "concat", "-safe", "0", "-i", "filelist.txt",
+        "-c", "copy", "output.mp4"
+      ]);
+
+      const data = await ffmpeg.readFile("output.mp4");
+      const blob = new Blob([new Uint8Array(data as unknown as ArrayBuffer)], { type: "video/mp4" });
+      const url = URL.createObjectURL(blob);
       setFinalVideoUrl(url);
       setComposeProgress("完了！");
+
+      // Cleanup
+      for (const name of fileNames) await ffmpeg.deleteFile(name).catch(() => {});
+      await ffmpeg.deleteFile("filelist.txt").catch(() => {});
+      await ffmpeg.deleteFile("output.mp4").catch(() => {});
     } catch (e) {
       console.error("Compose error:", e);
       alert("動画結合に失敗しました: " + (e instanceof Error ? e.message : String(e)));
