@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -17,8 +17,11 @@ import {
   BookOpen,
   TrendingUp,
   Megaphone,
+  Settings,
+  ChevronDown,
+  Check,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface SidebarProps {
   workspaceSlug: string;
@@ -27,6 +30,13 @@ interface SidebarProps {
 interface NavSection {
   title?: string;
   items: { label: string; href: string; icon: React.ComponentType<{ className?: string }> }[];
+}
+
+interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  role: string;
 }
 
 const navSections = (slug: string): NavSection[] => [
@@ -64,16 +74,54 @@ const navSections = (slug: string): NavSection[] => [
       { label: "ファイル", href: `/w/${slug}/assets`, icon: FileText },
     ],
   },
+  {
+    items: [
+      { label: "設定", href: `/w/${slug}/settings`, icon: Settings },
+    ],
+  },
 ];
 
 export default function Sidebar({ workspaceSlug }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
   const sections = navSections(workspaceSlug);
+
+  useEffect(() => {
+    fetch("/api/me/workspaces")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.ok && json.data?.items) {
+          setWorkspaces(json.data.items);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Close switcher on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
+        setSwitcherOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const currentWorkspace = workspaces.find((w) => w.slug === workspaceSlug);
 
   const isActive = (href: string) => {
     if (href === `/w/${workspaceSlug}`) return pathname === href;
     return pathname.startsWith(href);
+  };
+
+  const handleSwitchWorkspace = (slug: string) => {
+    setSwitcherOpen(false);
+    router.push(`/w/${slug}`);
   };
 
   const sidebarContent = (
@@ -86,6 +134,40 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
           </div>
           <span className="text-base font-bold tracking-tight text-zinc-900">Video Harness</span>
         </div>
+      </div>
+
+      {/* Workspace Switcher */}
+      <div className="px-3 pt-3 pb-1" ref={switcherRef}>
+        <button
+          onClick={() => setSwitcherOpen(!switcherOpen)}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-zinc-700 bg-zinc-50 hover:bg-zinc-100 transition-colors"
+        >
+          <span className="truncate">
+            {currentWorkspace?.name || workspaceSlug}
+          </span>
+          <ChevronDown className={cn("w-4 h-4 flex-shrink-0 text-zinc-400 transition-transform", switcherOpen && "rotate-180")} />
+        </button>
+        {switcherOpen && (
+          <div className="mt-1 rounded-lg border border-border bg-white shadow-lg py-1 z-50 relative">
+            {workspaces.map((ws) => (
+              <button
+                key={ws.id}
+                onClick={() => handleSwitchWorkspace(ws.slug)}
+                className="w-full flex items-center justify-between px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
+              >
+                <span className="truncate">{ws.name}</span>
+                {ws.slug === workspaceSlug && (
+                  <Check className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                )}
+              </button>
+            ))}
+            {workspaces.length === 0 && (
+              <div className="px-3 py-2 text-sm text-muted-foreground">
+                ワークスペースがありません
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Navigation */}

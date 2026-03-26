@@ -10,16 +10,30 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // API routes - check for auth cookie
+  // API routes under /api/w/ and /api/me/ - require auth token
+  if (pathname.startsWith('/api/w/') || pathname.startsWith('/api/me/')) {
+    const accessToken = request.cookies.get('sb-access-token')?.value;
+    if (!accessToken) {
+      return NextResponse.json(
+        { ok: false, data: null, error: { code: 'unauthorized', message: 'Not logged in' } },
+        { status: 401 }
+      );
+    }
+    return NextResponse.next();
+  }
+
+  // Other API routes (e.g. /api/auth/*) pass through
   if (pathname.startsWith('/api/')) {
-    return NextResponse.next(); // API routes handle their own auth via service_role
+    return NextResponse.next();
   }
 
   // Check for auth cookie on workspace pages
   if (pathname.startsWith('/w/')) {
-    const userId = request.cookies.get('sb-user-id')?.value;
-    if (!userId) {
-      return NextResponse.redirect(new URL('/login', request.url));
+    const accessToken = request.cookies.get('sb-access-token')?.value;
+    if (!accessToken) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
     }
   }
 

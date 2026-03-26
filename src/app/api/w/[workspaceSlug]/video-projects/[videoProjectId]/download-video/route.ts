@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { getWorkspaceWithAuth, errorResponse } from '@/lib/api-helpers';
 
 export const maxDuration = 60;
 
 // Proxy video download to bypass CORS restrictions from Runway CDN
 export async function GET(
   req: NextRequest,
-  { params }: { params: { videoProjectId: string } }
+  { params }: { params: { workspaceSlug: string; videoProjectId: string } }
 ) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, req);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
   const supabase = createServerClient();
   const { searchParams } = new URL(req.url);
   const sceneId = searchParams.get('sceneId');

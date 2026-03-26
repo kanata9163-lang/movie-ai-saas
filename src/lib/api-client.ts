@@ -291,6 +291,30 @@ export const api = {
   listAllSchedules: (slug: string) =>
     fetchAPI<(Milestone & { project_name: string })[]>(`/api/w/${slug}/schedules`),
 
+  // Workspaces
+  listMyWorkspaces: () =>
+    fetchAPI<{ items: Array<{ id: string; name: string; slug: string; role: string }> }>('/api/me/workspaces'),
+
+  // Workspace Settings
+  getWorkspaceSettings: (slug: string) =>
+    fetchAPI<{ workspace: Record<string, unknown>; role: string }>(`/api/w/${slug}/settings`),
+  updateWorkspaceSettings: (slug: string, data: { name?: string }) =>
+    fetchAPI<Record<string, unknown>>(`/api/w/${slug}/settings`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  // Members
+  listMembers: (slug: string) =>
+    fetchAPI<Array<{ id: string; user_id: string; role: string; email: string; display_name: string }>>(`/api/w/${slug}/members`),
+  removeMember: (slug: string, memberId: string) =>
+    fetchAPI<null>(`/api/w/${slug}/members?memberId=${memberId}`, { method: 'DELETE' }),
+
+  // Invites
+  createInvite: (slug: string) =>
+    fetchAPI<{ id: string; token: string; expires_at: string }>(`/api/w/${slug}/invites`, { method: 'POST' }),
+  listInvites: (slug: string) =>
+    fetchAPI<Array<{ id: string; token: string; expires_at: string }>>(`/api/w/${slug}/invites`),
+  acceptInvite: (token: string) =>
+    fetchAPI<{ workspaceSlug: string; alreadyMember: boolean }>('/api/invites/accept', { method: 'POST', body: JSON.stringify({ token }) }),
+
   // Auth
   login: (email: string, password: string) =>
     fetchAPI<{ user: unknown; session: unknown }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),

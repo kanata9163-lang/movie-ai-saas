@@ -32,7 +32,10 @@ export default function LoginPage() {
         throw new Error(json.error?.message || "ログインに失敗しました");
       }
       const slug = json.data?.workspaceSlug || "demo";
-      router.push(`/w/${slug}`);
+      // Check for redirect parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirect = urlParams.get("redirect");
+      router.push(redirect || `/w/${slug}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "ログインに失敗しました");
     } finally {

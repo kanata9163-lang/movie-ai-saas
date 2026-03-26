@@ -18,17 +18,36 @@ import {
   Zap,
   Target,
   Palette,
+  ExternalLink,
+  Film,
+  Eye,
+  Sparkles,
 } from "lucide-react";
 
 interface AdResearchPageProps {
   params: { workspaceSlug: string };
 }
 
+interface CreativeExample {
+  brandName: string;
+  adFormat: string;
+  visualDescription: string;
+  copyText: string;
+  whyItWorks: string;
+}
+
+interface Storyboard {
+  [key: string]: string;
+}
+
 interface AdPattern {
   patternName: string;
   description: string;
   effectiveness: string;
-  examples: string[];
+  examples?: string[];
+  creativeExamples?: CreativeExample[];
+  mockupImage?: string;
+  storyboard?: Storyboard;
   keyElements: {
     hook: string;
     body: string;
@@ -38,12 +57,18 @@ interface AdPattern {
   estimatedEngagement: string;
 }
 
+interface AdLibraryLink {
+  name: string;
+  url: string;
+}
+
 interface AdAnalysis {
   id: string;
   query: string;
   platform: string;
   results: {
     adPatterns?: AdPattern[];
+    adLibraryLinks?: AdLibraryLink[];
     overallInsights?: {
       topFormats?: string[];
       colorTrends?: string[];
@@ -214,43 +239,140 @@ export default function AdResearchPage({ params }: AdResearchPageProps) {
 
                   {expanded && (
                     <div className="px-5 pb-5 border-t border-border pt-4 space-y-5">
+                      {/* Ad Library Links */}
+                      {r.adLibraryLinks && r.adLibraryLinks.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {r.adLibraryLinks.map((link, i) => (
+                            <a
+                              key={i}
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100 transition-colors"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              {link.name}で実際の広告を見る
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Ad Patterns */}
                       {r.adPatterns && r.adPatterns.length > 0 && (
                         <div>
                           <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3">広告パターン</h4>
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                             {r.adPatterns.map((pattern, i) => (
-                              <div key={i} className="rounded-lg border border-border p-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="font-medium text-sm">{pattern.patternName}</span>
-                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${effectivenessColor(pattern.effectiveness)}`}>
-                                    効果: {pattern.effectiveness}
-                                  </span>
+                              <div key={i} className="rounded-lg border border-border overflow-hidden">
+                                {/* Pattern Header */}
+                                <div className="p-4 bg-zinc-50 border-b border-border">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-semibold text-sm">{pattern.patternName}</span>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${effectivenessColor(pattern.effectiveness)}`}>
+                                      効果: {pattern.effectiveness}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">{pattern.description}</p>
                                 </div>
-                                <p className="text-xs text-muted-foreground mb-3">{pattern.description}</p>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
-                                  <div className="rounded bg-zinc-50 p-2">
-                                    <p className="text-[10px] font-semibold text-zinc-400 mb-1 flex items-center gap-1">
-                                      <Zap className="w-3 h-3" />フック
+
+                                <div className="p-4 space-y-4">
+                                  {/* Mockup Image + Creative Examples side by side */}
+                                  {(pattern.mockupImage || (pattern.creativeExamples && pattern.creativeExamples.length > 0)) && (
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                      {/* Mockup Image */}
+                                      {pattern.mockupImage && (
+                                        <div>
+                                          <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-1">
+                                            <Sparkles className="w-3 h-3" />AIモックアップ
+                                          </p>
+                                          <div className="relative rounded-lg overflow-hidden border border-border bg-black flex items-center justify-center" style={{ maxHeight: '400px' }}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                              src={pattern.mockupImage}
+                                              alt={`${pattern.patternName} mockup`}
+                                              className="max-h-[400px] object-contain"
+                                            />
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Creative Examples */}
+                                      {pattern.creativeExamples && pattern.creativeExamples.length > 0 && (
+                                        <div>
+                                          <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-1">
+                                            <Eye className="w-3 h-3" />具体的なクリエイティブ例
+                                          </p>
+                                          <div className="space-y-2">
+                                            {pattern.creativeExamples.map((ex, j) => (
+                                              <div key={j} className="rounded-lg bg-gradient-to-br from-zinc-50 to-white border border-zinc-200 p-3">
+                                                <div className="flex items-center gap-2 mb-1.5">
+                                                  <span className="text-xs font-bold text-zinc-800">{ex.brandName}</span>
+                                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-600">{ex.adFormat}</span>
+                                                </div>
+                                                <p className="text-xs text-zinc-600 mb-1.5 leading-relaxed">{ex.visualDescription}</p>
+                                                {ex.copyText && (
+                                                  <div className="bg-white rounded border border-dashed border-zinc-300 p-2 mb-1.5">
+                                                    <p className="text-[10px] text-zinc-400 mb-0.5">広告コピー</p>
+                                                    <p className="text-xs text-zinc-800 font-medium italic">&quot;{ex.copyText}&quot;</p>
+                                                  </div>
+                                                )}
+                                                <p className="text-[10px] text-emerald-600 flex items-center gap-1">
+                                                  <CheckCircle className="w-3 h-3" />{ex.whyItWorks}
+                                                </p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Storyboard */}
+                                  {pattern.storyboard && Object.keys(pattern.storyboard).length > 0 && (
+                                    <div>
+                                      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-1">
+                                        <Film className="w-3 h-3" />ストーリーボード（時間構成）
+                                      </p>
+                                      <div className="flex overflow-x-auto gap-2 pb-2">
+                                        {Object.entries(pattern.storyboard).map(([key, val], j) => (
+                                          <div key={j} className="flex-shrink-0 w-48 rounded-lg bg-zinc-900 text-white p-3 relative">
+                                            <div className="absolute top-2 left-2 w-5 h-5 rounded-full bg-white text-zinc-900 flex items-center justify-center text-[10px] font-bold">
+                                              {j + 1}
+                                            </div>
+                                            <p className="text-[10px] text-zinc-400 mt-4 mb-1">{key.replace('scene', 'シーン')}</p>
+                                            <p className="text-xs leading-relaxed">{val}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Key Elements */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <div className="rounded bg-zinc-50 p-2">
+                                      <p className="text-[10px] font-semibold text-zinc-400 mb-1 flex items-center gap-1">
+                                        <Zap className="w-3 h-3" />フック
+                                      </p>
+                                      <p className="text-xs text-zinc-700">{pattern.keyElements?.hook}</p>
+                                    </div>
+                                    <div className="rounded bg-zinc-50 p-2">
+                                      <p className="text-[10px] font-semibold text-zinc-400 mb-1">本文</p>
+                                      <p className="text-xs text-zinc-700">{pattern.keyElements?.body}</p>
+                                    </div>
+                                    <div className="rounded bg-zinc-50 p-2">
+                                      <p className="text-[10px] font-semibold text-zinc-400 mb-1 flex items-center gap-1">
+                                        <Target className="w-3 h-3" />CTA
+                                      </p>
+                                      <p className="text-xs text-zinc-700">{pattern.keyElements?.cta}</p>
+                                    </div>
+                                  </div>
+
+                                  {pattern.targetAudience && (
+                                    <p className="text-[10px] text-muted-foreground">
+                                      ターゲット: {pattern.targetAudience}
                                     </p>
-                                    <p className="text-xs text-zinc-700">{pattern.keyElements?.hook}</p>
-                                  </div>
-                                  <div className="rounded bg-zinc-50 p-2">
-                                    <p className="text-[10px] font-semibold text-zinc-400 mb-1">本文</p>
-                                    <p className="text-xs text-zinc-700">{pattern.keyElements?.body}</p>
-                                  </div>
-                                  <div className="rounded bg-zinc-50 p-2">
-                                    <p className="text-[10px] font-semibold text-zinc-400 mb-1 flex items-center gap-1">
-                                      <Target className="w-3 h-3" />CTA
-                                    </p>
-                                    <p className="text-xs text-zinc-700">{pattern.keyElements?.cta}</p>
-                                  </div>
+                                  )}
                                 </div>
-                                {pattern.targetAudience && (
-                                  <p className="text-[10px] text-muted-foreground">
-                                    ターゲット: {pattern.targetAudience}
-                                  </p>
-                                )}
                               </div>
                             ))}
                           </div>

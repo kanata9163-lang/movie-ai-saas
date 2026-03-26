@@ -1,16 +1,26 @@
-import { getSupabase, jsonResponse, errorResponse } from '@/lib/api-helpers';
+import { NextRequest } from 'next/server';
+import { getSupabase, jsonResponse, errorResponse, getAuthUser } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const user = await getAuthUser(request);
+  if (!user) return errorResponse('unauthorized', 'Not logged in', 401);
+
   const db = getSupabase();
 
-  // For now, return all workspaces (auth will filter later)
-  const { data, error } = await db
-    .from('workspaces')
-    .select('*')
-    .order('created_at');
+  // Get only workspaces the user is a member of
+  const { data: memberships, error: memError } = await db
+    .from('workspace_members')
+    .select('role, workspace_id, workspaces(*)')
+    .eq('user_id', user.id);
 
-  if (error) return errorResponse('db_error', error.message, 500);
-  return jsonResponse({ items: data });
+  if (memError) return errorResponse('db_error', memError.message, 500);
+
+  const items = (memberships || []).map((m: Record<string, unknown>) => ({
+    ...(m.workspaces as Record<string, unknown>),
+    role: m.role,
+  }));
+
+  return jsonResponse({ items });
 }
