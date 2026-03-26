@@ -22,6 +22,9 @@ import {
   Film,
   ChevronDown,
   ChevronUp,
+  Pencil,
+  Save,
+  RotateCcw,
 } from "lucide-react";
 import ShareButton from "@/components/ShareButton";
 
@@ -83,6 +86,10 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
   const [composeProgress, setComposeProgress] = useState("");
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(false);
+  const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<{ narration_text: string; description: string; image_prompt: string; duration: number }>({ narration_text: '', description: '', image_prompt: '', duration: 5 });
+  const [savingScene, setSavingScene] = useState(false);
+  const [regeneratingScript, setRegeneratingScript] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -164,6 +171,43 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
       await loadProject();
     } catch { /* ignore */ }
     finally { setActionLoading(false); }
+  };
+
+  const startEditing = (scene: Scene) => {
+    setEditingSceneId(scene.id);
+    setEditFields({
+      narration_text: scene.narration_text || '',
+      description: scene.description || '',
+      image_prompt: scene.image_prompt || '',
+      duration: scene.duration || 5,
+    });
+  };
+
+  const saveScene = async () => {
+    if (!editingSceneId) return;
+    setSavingScene(true);
+    try {
+      await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}/scenes`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sceneId: editingSceneId, ...editFields }),
+      });
+      setEditingSceneId(null);
+      await loadProject();
+    } catch { alert('保存に失敗しました'); }
+    finally { setSavingScene(false); }
+  };
+
+  const regenerateScript = async () => {
+    if (!confirm('台本を再生成しますか？現在のシーンは全て削除されます。')) return;
+    setRegeneratingScript(true);
+    try {
+      await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}/scenes`, { method: 'POST' });
+      await loadProject();
+      // Auto-run analyze
+      await runAction('analyze');
+    } catch { alert('再生成に失敗しました'); }
+    finally { setRegeneratingScript(false); }
   };
 
   const proxyUrl = (sceneId: string, type: 'video' | 'audio' = 'video') =>
@@ -390,10 +434,16 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
               </Button>
             )}
             {project.status === 'script_ready' && (
-              <Button onClick={() => runAction('generate-images')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
-                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                画像を生成
-              </Button>
+              <>
+                <Button onClick={() => runAction('generate-images')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                  画像を生成
+                </Button>
+                <Button onClick={regenerateScript} disabled={regeneratingScript || actionLoading} variant="outline" className="h-11 px-6">
+                  {regeneratingScript ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                  台本を再生成
+                </Button>
+              </>
             )}
             {project.status === 'images_ready' && !project.scenes.some(s => s.audio_url) && (
               <Button onClick={() => runAction('generate-audio')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
@@ -505,47 +555,93 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                           </div>
                         )}
 
-                        {/* Narration text */}
-                        {scene.narration_text && (
-                          <div>
-                            <label className="text-[10px] font-medium text-muted-foreground block mb-1">セリフ</label>
-                            <p className="text-xs leading-relaxed bg-zinc-50 rounded p-2 border border-border">
-                              {scene.narration_text}
-                            </p>
+                        {editingSceneId === scene.id ? (
+                          /* Edit mode */
+                          <div className="space-y-2">
+                            <div>
+                              <label className="text-[10px] font-medium text-muted-foreground block mb-1">セリフ</label>
+                              <textarea
+                                value={editFields.narration_text}
+                                onChange={e => setEditFields(f => ({ ...f, narration_text: e.target.value }))}
+                                className="w-full text-xs p-2 border border-blue-300 rounded bg-blue-50 resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                rows={3}
+                              />
+                              <p className="text-[9px] text-muted-foreground mt-0.5">{editFields.narration_text.length}文字（推奨: {editFields.duration <= 5 ? 20 : 40}文字以内）</p>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-medium text-muted-foreground block mb-1">シーン説明</label>
+                              <textarea
+                                value={editFields.description}
+                                onChange={e => setEditFields(f => ({ ...f, description: e.target.value }))}
+                                className="w-full text-[11px] p-2 border border-border rounded resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                rows={3}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-medium text-muted-foreground block mb-1">画像プロンプト</label>
+                              <textarea
+                                value={editFields.image_prompt}
+                                onChange={e => setEditFields(f => ({ ...f, image_prompt: e.target.value }))}
+                                className="w-full text-[10px] p-2 border border-border rounded resize-none focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                rows={3}
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" className="flex-1 text-xs h-7" onClick={saveScene} disabled={savingScene}>
+                                {savingScene ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                                保存
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setEditingSceneId(null)}>
+                                キャンセル
+                              </Button>
+                            </div>
                           </div>
-                        )}
+                        ) : (
+                          /* View mode */
+                          <>
+                            {scene.narration_text && (
+                              <div>
+                                <label className="text-[10px] font-medium text-muted-foreground block mb-1">セリフ</label>
+                                <p className="text-xs leading-relaxed bg-zinc-50 rounded p-2 border border-border">
+                                  {scene.narration_text}
+                                </p>
+                              </div>
+                            )}
 
-                        {/* Description */}
-                        {scene.description && (
-                          <div>
-                            <label className="text-[10px] font-medium text-muted-foreground block mb-1">シーン説明</label>
-                            <p className="text-[11px] text-muted-foreground leading-relaxed">
-                              {scene.description}
-                            </p>
-                          </div>
-                        )}
+                            {scene.description && (
+                              <div>
+                                <label className="text-[10px] font-medium text-muted-foreground block mb-1">シーン説明</label>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                  {scene.description}
+                                </p>
+                              </div>
+                            )}
 
-                        {/* Image Prompt */}
-                        {scene.image_prompt && (
-                          <div>
-                            <label className="text-[10px] font-medium text-muted-foreground block mb-1">プロンプト</label>
-                            <p className="text-[10px] text-muted-foreground bg-zinc-50 rounded p-2 border border-border leading-relaxed">
-                              {scene.image_prompt}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Regenerate button */}
-                        {(project.status === 'images_ready' || project.status === 'script_ready') && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full text-xs mt-1"
-                            onClick={() => regenerateImage(scene.id)}
-                            disabled={actionLoading}
-                          >
-                            <RefreshCw className="w-3 h-3" />画像を再生成
-                          </Button>
+                            {/* Action buttons */}
+                            <div className="flex gap-1.5 pt-1">
+                              {(project.status === 'script_ready' || project.status === 'images_ready') && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex-1 text-[10px] h-7"
+                                  onClick={() => startEditing(scene)}
+                                >
+                                  <Pencil className="w-3 h-3" />編集
+                                </Button>
+                              )}
+                              {(project.status === 'images_ready' || project.status === 'script_ready') && scene.image_url && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex-1 text-[10px] h-7"
+                                  onClick={() => regenerateImage(scene.id)}
+                                  disabled={actionLoading}
+                                >
+                                  <RefreshCw className="w-3 h-3" />画像再生成
+                                </Button>
+                              )}
+                            </div>
+                          </>
                         )}
                       </div>
                     </div>
