@@ -364,7 +364,18 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
     );
   }
 
-  const currentStep = getWizardStep(project.status);
+  // When failed, determine the actual progress from scene data
+  const failedStep = (() => {
+    if (project.status !== 'failed') return -1;
+    const hasScenes = project.scenes.length > 0;
+    const hasImages = project.scenes.some(s => s.image_url);
+    const hasAudio = project.scenes.some(s => s.audio_url);
+    if (hasAudio) return 3; // failed at video generation
+    if (hasImages) return 2; // failed at audio generation
+    if (hasScenes) return 1; // failed at image generation
+    return 0; // failed at analysis
+  })();
+  const currentStep = project.status === 'failed' ? failedStep : getWizardStep(project.status);
   const isCompleted = project.status === 'completed';
   const scenesWithImages = project.scenes.filter(s => s.image_url);
 
@@ -391,14 +402,15 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
             {WIZARD_STEPS.map((step, idx) => {
               const done = isCompleted || currentStep > idx;
               const active = !isCompleted && currentStep === idx;
+              const isFailed = project.status === 'failed' && currentStep === idx;
               return (
                 <div key={step.key} className="flex items-center">
                   <div className="flex flex-col items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all
-                      ${done ? 'bg-white border-zinc-400 text-zinc-500' : active ? 'bg-white border-zinc-900 text-zinc-900' : 'bg-zinc-100 border-zinc-200 text-zinc-400'}`}>
-                      {done ? <Check className="w-4 h-4" /> : idx + 1}
+                      ${isFailed ? 'bg-red-50 border-red-500 text-red-600' : done ? 'bg-white border-zinc-400 text-zinc-500' : active ? 'bg-white border-zinc-900 text-zinc-900' : 'bg-zinc-100 border-zinc-200 text-zinc-400'}`}>
+                      {isFailed ? <AlertCircle className="w-4 h-4" /> : done ? <Check className="w-4 h-4" /> : idx + 1}
                     </div>
-                    <span className={`text-[11px] mt-1.5 whitespace-nowrap ${active ? 'font-bold text-zinc-900' : done ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                    <span className={`text-[11px] mt-1.5 whitespace-nowrap ${isFailed ? 'font-bold text-red-600' : active ? 'font-bold text-zinc-900' : done ? 'text-zinc-500' : 'text-zinc-400'}`}>
                       {step.label}
                     </span>
                   </div>
@@ -448,36 +460,86 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3 mb-8 justify-center">
-            {(project.status === 'pending' || project.status === 'failed') && (
-              <Button onClick={() => runAction('analyze')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
-                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                URL解析 & 台本生成
-              </Button>
-            )}
-            {project.status === 'script_ready' && (
-              <>
-                <Button onClick={() => runAction('generate-images')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
-                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                  画像を生成
-                </Button>
-                <Button onClick={regenerateScript} disabled={regeneratingScript || actionLoading} variant="outline" className="h-11 px-6">
-                  {regeneratingScript ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-                  台本を再生成
-                </Button>
-              </>
-            )}
-            {project.status === 'images_ready' && !project.scenes.some(s => s.audio_url) && (
-              <Button onClick={() => runAction('generate-audio')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
-                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
-                ナレーション生成（音声の長さで動画時間を自動調整）
-              </Button>
-            )}
-            {project.status === 'images_ready' && project.scenes.some(s => s.audio_url) && (
-              <Button onClick={() => runAction('generate-video')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
-                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                動画を生成（Runway AI）
-              </Button>
-            )}
+            {(() => {
+              // Determine the best recovery action based on actual scene data
+              const hasScenes = project.scenes.length > 0;
+              const hasImages = project.scenes.some(s => s.image_url);
+              const hasAudio = project.scenes.some(s => s.audio_url);
+              const hasVideo = project.scenes.some(s => s.video_url);
+              const isFailed = project.status === 'failed';
+
+              return (
+                <>
+                  {/* Pending: start from scratch */}
+                  {project.status === 'pending' && (
+                    <Button onClick={() => runAction('analyze')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                      {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                      URL解析 & 台本生成
+                    </Button>
+                  )}
+
+                  {/* Failed: show smart recovery buttons based on what data exists */}
+                  {isFailed && !hasScenes && (
+                    <Button onClick={() => runAction('analyze')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                      {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                      URL解析 & 台本生成（リトライ）
+                    </Button>
+                  )}
+                  {isFailed && hasScenes && !hasImages && (
+                    <Button onClick={() => runAction('generate-images')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                      {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                      画像を生成（リトライ）
+                    </Button>
+                  )}
+                  {isFailed && hasImages && !hasAudio && (
+                    <Button onClick={() => runAction('generate-audio')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                      {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
+                      ナレーション生成（リトライ）
+                    </Button>
+                  )}
+                  {isFailed && hasImages && hasAudio && !hasVideo && (
+                    <Button onClick={() => runAction('generate-video')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                      {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                      動画を生成（リトライ）
+                    </Button>
+                  )}
+                  {isFailed && hasVideo && (
+                    <Button onClick={() => runAction('generate-video')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                      {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                      動画を再生成
+                    </Button>
+                  )}
+
+                  {/* Script ready */}
+                  {project.status === 'script_ready' && (
+                    <>
+                      <Button onClick={() => runAction('generate-images')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                        {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                        画像を生成
+                      </Button>
+                      <Button onClick={regenerateScript} disabled={regeneratingScript || actionLoading} variant="outline" className="h-11 px-6">
+                        {regeneratingScript ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                        台本を再生成
+                      </Button>
+                    </>
+                  )}
+
+                  {/* Images ready: generate audio or video */}
+                  {project.status === 'images_ready' && !hasAudio && (
+                    <Button onClick={() => runAction('generate-audio')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                      {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
+                      ナレーション生成（音声の長さで動画時間を自動調整）
+                    </Button>
+                  )}
+                  {project.status === 'images_ready' && hasAudio && (
+                    <Button onClick={() => runAction('generate-video')} disabled={actionLoading} className="bg-zinc-900 text-white h-11 px-6">
+                      {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                      動画を生成（Runway AI）
+                    </Button>
+                  )}
+                </>
+              );
+            })()}
             {project.scenes.some(s => s.video_url) && !project.scenes.some(s => s.audio_url) && project.status !== 'generating_audio' && (
               <Button onClick={() => runAction('generate-audio')} disabled={actionLoading} className="bg-orange-600 text-white hover:bg-orange-700 h-11 px-6">
                 {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
