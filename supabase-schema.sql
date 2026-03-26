@@ -275,5 +275,20 @@ create policy "service_role_all" on documents for all using (true) with check (t
 create policy "service_role_all" on jobs for all using (true) with check (true);
 create policy "service_role_all" on invite_tokens for all using (true) with check (true);
 
+-- Integrations (Slack, LINE, etc.)
+create table if not exists integrations (
+  id uuid primary key default uuid_generate_v4(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  type text not null, -- 'slack', 'line'
+  config jsonb not null default '{}',
+  enabled boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(workspace_id, type)
+);
+
+alter table integrations enable row level security;
+create policy "service_role_all" on integrations for all using (true) with check (true);
+
 -- Insert default workspace
 insert into workspaces (name, slug, account_type) values ('デモワークスペース', 'demo', 'free');

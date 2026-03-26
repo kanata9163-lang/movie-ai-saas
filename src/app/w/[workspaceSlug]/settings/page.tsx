@@ -126,9 +126,12 @@ export default function SettingsPage({ params }: SettingsPageProps) {
       const json = await res.json();
       if (json.ok) {
         setWorkspace(json.data);
+        alert("ワークスペース名を保存しました");
+      } else {
+        alert(json.error?.message || "保存に失敗しました");
       }
-    } catch {
-      alert("保存に失敗しました");
+    } catch (e) {
+      alert("保存に失敗しました: " + (e instanceof Error ? e.message : ""));
     } finally {
       setSaving(false);
     }
@@ -144,9 +147,12 @@ export default function SettingsPage({ params }: SettingsPageProps) {
       const json = await res.json();
       if (json.ok) {
         setInvites((prev) => [json.data, ...prev]);
+        alert("招待リンクを作成しました");
+      } else {
+        alert(json.error?.message || "招待リンクの作成に失敗しました");
       }
-    } catch {
-      alert("招待リンクの作成に失敗しました");
+    } catch (e) {
+      alert("招待リンクの作成に失敗しました: " + (e instanceof Error ? e.message : ""));
     } finally {
       setCreatingInvite(false);
     }
