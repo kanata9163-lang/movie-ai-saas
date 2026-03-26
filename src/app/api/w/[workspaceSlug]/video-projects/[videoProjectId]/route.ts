@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { getWorkspaceWithAuth, errorResponse } from '@/lib/api-helpers';
+import { sendSlackNotification } from '@/lib/integrations/slack';
+import { sendLineNotification } from '@/lib/integrations/line';
 
 export async function GET(req: NextRequest, { params }: { params: { workspaceSlug: string; videoProjectId: string } }) {
   const auth = await getWorkspaceWithAuth(params.workspaceSlug, req);
@@ -47,6 +49,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { workspaceS
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Send notifications when video project completes
+  if (body.status === '完了' || body.status === 'completed') {
+    const wsId = auth.workspace.id as string;
+    const title = data?.title || '無題';
+    const notifText = `\ud83c\udfac \u52d5\u753b\u300c${title}\u300d\u304c\u5b8c\u6210\u3057\u307e\u3057\u305f\uff01`;
+    await Promise.all([
+      sendSlackNotification(wsId, { text: notifText }),
+      sendLineNotification(wsId, notifText),
+    ]);
+  }
+
   return NextResponse.json({ ok: true, data });
 }
 

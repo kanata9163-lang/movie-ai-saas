@@ -169,6 +169,49 @@ export interface DashboardData {
     pending_tasks: number;
     overdue_tasks: number;
   };
+  counts: {
+    video_projects: number;
+    storyboards: number;
+    knowledge_items: number;
+    assets: number;
+  };
+  recent_video_projects: Array<{
+    id: string;
+    title: string;
+    status: string;
+    created_at: string;
+  }>;
+  recent_storyboards: Array<{
+    id: string;
+    title: string;
+    created_at: string;
+    project_id: string;
+    status: string;
+  }>;
+  recent_ad_analyses: Array<{
+    id: string;
+    query: string;
+    platform: string;
+    created_at: string;
+  }>;
+  budget_overview: {
+    total_budget: number;
+    total_spent: number;
+    currency: string;
+  };
+  integrations: Array<{
+    type: string;
+    enabled: boolean;
+  }>;
+}
+
+export interface Integration {
+  id: string;
+  type: string;
+  config: Record<string, unknown>;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Job {
@@ -319,6 +362,14 @@ export const api = {
     fetchAPI<Array<{ id: string; token: string; expires_at: string }>>(`/api/w/${slug}/invites`),
   acceptInvite: (token: string) =>
     fetchAPI<{ workspaceSlug: string; alreadyMember: boolean }>('/api/invites/accept', { method: 'POST', body: JSON.stringify({ token }) }),
+
+  // Integrations
+  listIntegrations: (slug: string) =>
+    fetchAPI<Integration[]>(`/api/w/${slug}/integrations`),
+  saveIntegration: (slug: string, data: { type: string; config: Record<string, unknown>; enabled: boolean }) =>
+    fetchAPI<Integration>(`/api/w/${slug}/integrations`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteIntegration: (slug: string, type: string) =>
+    fetchAPI<null>(`/api/w/${slug}/integrations?type=${type}`, { method: 'DELETE' }),
 
   // Auth
   login: (email: string, password: string) =>

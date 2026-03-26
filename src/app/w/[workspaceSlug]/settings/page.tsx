@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/lib/useUser";
-import { Settings, Users, Link2, Loader2, Trash2, Copy, Check } from "lucide-react";
+import { Settings, Users, Link2, Loader2, Trash2, Copy, Check, MessageSquare, Zap, Send } from "lucide-react";
 import LoadingAnimation from "@/components/LoadingAnimation";
 
 interface SettingsPageProps {
@@ -43,17 +43,33 @@ export default function SettingsPage({ params }: SettingsPageProps) {
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
+  // Integration state
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState("");
+  const [slackChannel, setSlackChannel] = useState("");
+  const [slackEnabled, setSlackEnabled] = useState(false);
+  const [slackSaving, setSlackSaving] = useState(false);
+  const [slackTesting, setSlackTesting] = useState(false);
+  const [slackConnected, setSlackConnected] = useState(false);
+
+  const [lineToken, setLineToken] = useState("");
+  const [lineEnabled, setLineEnabled] = useState(false);
+  const [lineSaving, setLineSaving] = useState(false);
+  const [lineTesting, setLineTesting] = useState(false);
+  const [lineConnected, setLineConnected] = useState(false);
+
   const loadData = async () => {
     try {
-      const [settingsRes, membersRes, invitesRes] = await Promise.all([
+      const [settingsRes, membersRes, invitesRes, integrationsRes] = await Promise.all([
         fetch(`/api/w/${workspaceSlug}/settings`),
         fetch(`/api/w/${workspaceSlug}/members`),
         fetch(`/api/w/${workspaceSlug}/invites`),
+        fetch(`/api/w/${workspaceSlug}/integrations`),
       ]);
 
       const settingsJson = await settingsRes.json();
       const membersJson = await membersRes.json();
       const invitesJson = await invitesRes.json();
+      const integrationsJson = await integrationsRes.json();
 
       if (settingsJson.ok) {
         setWorkspace(settingsJson.data.workspace);
@@ -62,6 +78,26 @@ export default function SettingsPage({ params }: SettingsPageProps) {
       }
       if (membersJson.ok) setMembers(membersJson.data);
       if (invitesJson.ok) setInvites(invitesJson.data);
+      if (integrationsJson.ok) {
+        const integrations = integrationsJson.data as Array<{
+          type: string;
+          config: Record<string, string>;
+          enabled: boolean;
+        }>;
+        const slack = integrations.find((i) => i.type === "slack");
+        if (slack) {
+          setSlackEnabled(slack.enabled);
+          setSlackConnected(true);
+          setSlackWebhookUrl(slack.config?.webhook_url || "");
+          setSlackChannel(slack.config?.channel_name || "");
+        }
+        const line = integrations.find((i) => i.type === "line");
+        if (line) {
+          setLineEnabled(line.enabled);
+          setLineConnected(true);
+          setLineToken(line.config?.access_token || "");
+        }
+      }
     } catch {
       // ignore
     } finally {
@@ -132,6 +168,111 @@ export default function SettingsPage({ params }: SettingsPageProps) {
       }
     } catch {
       alert("削除に失敗しました");
+    }
+  };
+
+  const handleSaveSlack = async () => {
+    setSlackSaving(true);
+    try {
+      const res = await fetch(`/api/w/${workspaceSlug}/integrations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "slack",
+          config: { webhook_url: slackWebhookUrl, channel_name: slackChannel },
+          enabled: slackEnabled,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setSlackConnected(true);
+        alert("Slack設定を保存しました");
+      } else {
+        alert(json.error?.message || "保存に失敗しました");
+      }
+    } catch {
+      alert("保存に失敗しました");
+    } finally {
+      setSlackSaving(false);
+    }
+  };
+
+  const handleTestSlack = async () => {
+    setSlackTesting(true);
+    try {
+      if (!slackWebhookUrl) {
+        alert("Webhook URLを入力してください");
+        setSlackTesting(false);
+        return;
+      }
+      const res = await fetch(slackWebhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "Mov Manage テスト通知: 接続が正常に動作しています。" }),
+      });
+      if (res.ok) {
+        alert("テスト通知を送信しました");
+      } else {
+        alert("テスト通知の送信に失敗しました。Webhook URLを確認してください。");
+      }
+    } catch {
+      alert("テスト通知の送信に失敗しました。Webhook URLを確認してください。");
+    } finally {
+      setSlackTesting(false);
+    }
+  };
+
+  const handleSaveLine = async () => {
+    setLineSaving(true);
+    try {
+      const res = await fetch(`/api/w/${workspaceSlug}/integrations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "line",
+          config: { access_token: lineToken },
+          enabled: lineEnabled,
+        }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setLineConnected(true);
+        alert("LINE設定を保存しました");
+      } else {
+        alert(json.error?.message || "保存に失敗しました");
+      }
+    } catch {
+      alert("保存に失敗しました");
+    } finally {
+      setLineSaving(false);
+    }
+  };
+
+  const handleTestLine = async () => {
+    setLineTesting(true);
+    try {
+      if (!lineToken) {
+        alert("アクセストークンを入力してください");
+        setLineTesting(false);
+        return;
+      }
+      const res = await fetch("https://notify-api.line.me/api/notify", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lineToken}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: `message=${encodeURIComponent("Mov Manage テスト通知: 接続が正常に動作しています。")}`,
+      });
+      if (res.ok) {
+        alert("テスト通知を送信しました");
+      } else {
+        alert("テスト通知の送信に失敗しました。アクセストークンを確認してください。");
+      }
+    } catch {
+      alert("テスト通知の送信に失敗しました。アクセストークンを確認してください。");
+    } finally {
+      setLineTesting(false);
     }
   };
 
@@ -280,6 +421,182 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   有効な招待リンクがありません
                 </div>
               )}
+            </div>
+          </section>
+        )}
+
+        {/* Integrations */}
+        {isOwnerOrAdmin && (
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Zap className="w-5 h-5 text-zinc-500" />
+              <h2 className="text-base font-semibold">連携設定</h2>
+            </div>
+
+            {/* Slack Integration */}
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4 mb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#4A154B]/10 flex items-center justify-center">
+                    <MessageSquare className="w-5 h-5 text-[#4A154B]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Slack連携</h3>
+                    <p className="text-xs text-muted-foreground">Webhook URLで通知を送信</p>
+                  </div>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                  slackConnected && slackEnabled
+                    ? "bg-green-100 text-green-700"
+                    : "bg-zinc-100 text-zinc-500"
+                }`}>
+                  {slackConnected && slackEnabled ? "接続済み" : "未接続"}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-zinc-600 mb-1 block">
+                    Webhook URL
+                  </label>
+                  <Input
+                    type="url"
+                    value={slackWebhookUrl}
+                    onChange={(e) => setSlackWebhookUrl(e.target.value)}
+                    placeholder="https://hooks.slack.com/services/..."
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-zinc-600 mb-1 block">
+                    チャンネル名 (任意)
+                  </label>
+                  <Input
+                    value={slackChannel}
+                    onChange={(e) => setSlackChannel(e.target.value)}
+                    placeholder="#general"
+                    className="text-sm max-w-xs"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-zinc-600">有効化</label>
+                  <button
+                    onClick={() => setSlackEnabled(!slackEnabled)}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                      slackEnabled ? "bg-green-500" : "bg-zinc-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                        slackEnabled ? "translate-x-5" : ""
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-border">
+                <Button size="sm" onClick={handleSaveSlack} disabled={slackSaving}>
+                  {slackSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "保存"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTestSlack}
+                  disabled={slackTesting || !slackWebhookUrl}
+                  className="gap-1.5"
+                >
+                  {slackTesting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  テスト送信
+                </Button>
+              </div>
+            </div>
+
+            {/* LINE Integration */}
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#00B900]/10 flex items-center justify-center">
+                    <Zap className="w-5 h-5 text-[#00B900]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">LINE Notify連携</h3>
+                    <p className="text-xs text-muted-foreground">LINE Notifyで通知を送信</p>
+                  </div>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                  lineConnected && lineEnabled
+                    ? "bg-green-100 text-green-700"
+                    : "bg-zinc-100 text-zinc-500"
+                }`}>
+                  {lineConnected && lineEnabled ? "接続済み" : "未接続"}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-zinc-600 mb-1 block">
+                    アクセストークン
+                  </label>
+                  <Input
+                    type="password"
+                    value={lineToken}
+                    onChange={(e) => setLineToken(e.target.value)}
+                    placeholder="LINE Notify アクセストークン"
+                    className="text-sm"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    <a
+                      href="https://notify-bot.line.me/my/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      LINE Notify
+                    </a>
+                    {" "}でトークンを発行してください
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-zinc-600">有効化</label>
+                  <button
+                    onClick={() => setLineEnabled(!lineEnabled)}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                      lineEnabled ? "bg-green-500" : "bg-zinc-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                        lineEnabled ? "translate-x-5" : ""
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-border">
+                <Button size="sm" onClick={handleSaveLine} disabled={lineSaving}>
+                  {lineSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "保存"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTestLine}
+                  disabled={lineTesting || !lineToken}
+                  className="gap-1.5"
+                >
+                  {lineTesting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  テスト送信
+                </Button>
+              </div>
             </div>
           </section>
         )}
