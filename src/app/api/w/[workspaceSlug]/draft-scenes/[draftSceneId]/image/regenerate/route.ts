@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getSupabase, jsonResponse, errorResponse } from '@/lib/api-helpers';
+import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 import { generateSceneImage, type ReferenceImage } from '@/lib/gemini';
 
 export const maxDuration = 60;
@@ -8,6 +8,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; draftSceneId: string } }
 ) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
   const db = getSupabase();
 
   const { data: scene, error: sceneError } = await db

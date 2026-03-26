@@ -1,19 +1,19 @@
 import { NextRequest } from 'next/server';
-import { getSupabase, jsonResponse, errorResponse, getWorkspaceBySlug } from '@/lib/api-helpers';
+import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; projectId: string } }
 ) {
-  const db = getSupabase();
-  const workspace = await getWorkspaceBySlug(params.workspaceSlug);
-  if (!workspace) return errorResponse('not_found', 'Workspace not found', 404);
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
+  const db = getSupabase();
   const { data: project, error } = await db
     .from('projects')
     .select('*')
     .eq('id', params.projectId)
-    .eq('workspace_id', workspace.id)
+    .eq('workspace_id', auth.workspace.id)
     .single();
 
   if (error || !project) return errorResponse('not_found', 'Project not found', 404);
@@ -58,10 +58,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; projectId: string } }
 ) {
-  const db = getSupabase();
-  const workspace = await getWorkspaceBySlug(params.workspaceSlug);
-  if (!workspace) return errorResponse('not_found', 'Workspace not found', 404);
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
+  const db = getSupabase();
   const body = await request.json();
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.name !== undefined) updates.name = body.name;
@@ -74,7 +74,7 @@ export async function PATCH(
     .from('projects')
     .update(updates)
     .eq('id', params.projectId)
-    .eq('workspace_id', workspace.id)
+    .eq('workspace_id', auth.workspace.id)
     .select()
     .single();
 
@@ -86,15 +86,15 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; projectId: string } }
 ) {
-  const db = getSupabase();
-  const workspace = await getWorkspaceBySlug(params.workspaceSlug);
-  if (!workspace) return errorResponse('not_found', 'Workspace not found', 404);
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
+  const db = getSupabase();
   const { error } = await db
     .from('projects')
     .delete()
     .eq('id', params.projectId)
-    .eq('workspace_id', workspace.id);
+    .eq('workspace_id', auth.workspace.id);
 
   if (error) return errorResponse('db_error', error.message, 500);
   return jsonResponse(null);

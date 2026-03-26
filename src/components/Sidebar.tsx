@@ -14,6 +14,9 @@ import {
   X,
   Video,
   Clapperboard,
+  BookOpen,
+  TrendingUp,
+  Megaphone,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -44,6 +47,14 @@ const navSections = (slug: string): NavSection[] => [
     items: [
       { label: "動画プロジェクト", href: `/w/${slug}/video`, icon: Video },
       { label: "新規動画生成", href: `/w/${slug}/video/new`, icon: Clapperboard },
+    ],
+  },
+  {
+    title: "ナレッジ",
+    items: [
+      { label: "ナレッジベース", href: `/w/${slug}/knowledge`, icon: BookOpen },
+      { label: "トレンドリサーチ", href: `/w/${slug}/trends`, icon: TrendingUp },
+      { label: "広告分析", href: `/w/${slug}/ad-research`, icon: Megaphone },
     ],
   },
   {

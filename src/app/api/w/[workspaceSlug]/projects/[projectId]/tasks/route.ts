@@ -1,14 +1,14 @@
 import { NextRequest } from 'next/server';
-import { getSupabase, jsonResponse, errorResponse, getWorkspaceBySlug } from '@/lib/api-helpers';
+import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; projectId: string } }
 ) {
-  const db = getSupabase();
-  const workspace = await getWorkspaceBySlug(params.workspaceSlug);
-  if (!workspace) return errorResponse('not_found', 'Workspace not found', 404);
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
+  const db = getSupabase();
   const { data, error } = await db
     .from('tasks')
     .select('*')
@@ -23,10 +23,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; projectId: string } }
 ) {
-  const db = getSupabase();
-  const workspace = await getWorkspaceBySlug(params.workspaceSlug);
-  if (!workspace) return errorResponse('not_found', 'Workspace not found', 404);
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
+  const db = getSupabase();
   const body = await request.json();
   if (!body.title) return errorResponse('validation', 'title is required');
 
@@ -34,7 +34,7 @@ export async function POST(
     .from('tasks')
     .insert({
       project_id: params.projectId,
-      workspace_id: workspace.id,
+      workspace_id: auth.workspace.id,
       title: body.title,
       start_date: body.start_date || null,
       end_date: body.end_date || null,

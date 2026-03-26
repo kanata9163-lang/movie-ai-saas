@@ -1,10 +1,13 @@
 import { NextRequest } from 'next/server';
-import { getSupabase, jsonResponse, errorResponse } from '@/lib/api-helpers';
+import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; projectId: string } }
 ) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
   const db = getSupabase();
   const { data, error } = await db
     .from('storyboards')

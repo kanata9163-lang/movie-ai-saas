@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { getSupabase, jsonResponse, errorResponse, getWorkspaceBySlug } from '@/lib/api-helpers';
+import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 import { generateStoryboardScenes, type StoryboardGenerateParams } from '@/lib/gemini';
 
 // Increase timeout for AI generation (Vercel Hobby: max 60s)
@@ -10,9 +10,11 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; projectId: string } }
 ) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
   const db = getSupabase();
-  const workspace = await getWorkspaceBySlug(params.workspaceSlug);
-  if (!workspace) return errorResponse('not_found', 'Workspace not found', 404);
+  const workspace = auth.workspace;
 
   const body: StoryboardGenerateParams = await request.json();
   if (!body.title) return errorResponse('validation', 'title is required');

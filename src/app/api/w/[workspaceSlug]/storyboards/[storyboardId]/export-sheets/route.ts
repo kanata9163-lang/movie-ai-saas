@@ -1,10 +1,13 @@
 import { NextRequest } from 'next/server';
-import { getSupabase, jsonResponse, errorResponse } from '@/lib/api-helpers';
+import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; storyboardId: string } }
 ) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
   // Get Google access token from cookie
   const googleToken = request.cookies.get('google-access-token')?.value;
 

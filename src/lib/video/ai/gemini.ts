@@ -53,12 +53,14 @@ export async function generateScript(
   analysis: CompanyAnalysis,
   imageDescriptions: string[],
   sceneCount: number,
-  referenceImages?: ReferenceImage[]
+  referenceImages?: ReferenceImage[],
+  knowledgeContext?: string
 ): Promise<Storyboard> {
   const prompt = GENERATE_SCRIPT_PROMPT
     .replace('{analysis}', JSON.stringify(analysis, null, 2))
     .replace('{imageDescriptions}', imageDescriptions.length > 0 ? imageDescriptions.join('\n') : 'なし')
-    .replace('{sceneCount}', String(sceneCount));
+    .replace('{sceneCount}', String(sceneCount))
+    .replace('{knowledgeContext}', knowledgeContext || '');
 
   const parts: Array<Record<string, unknown>> = [];
 

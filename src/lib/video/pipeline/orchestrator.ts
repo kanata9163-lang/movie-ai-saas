@@ -78,12 +78,40 @@ export async function runAnalyzeAndScript(projectId: string) {
       await addLog(projectId, `参照画像: ${referenceImages.length}枚をAIに送信`);
     }
 
-    // Step 2: Generate Script
+    // Step 2: Fetch workspace knowledge for context
+    let knowledgeContext = '';
+    try {
+      const { data: knowledgeItems } = await supabase
+        .from('knowledge_items')
+        .select('title, content_type, content_text')
+        .eq('workspace_id', project.workspace_id)
+        .limit(20);
+
+      if (knowledgeItems && knowledgeItems.length > 0) {
+        const knowledgeParts = knowledgeItems.map((item: { title: string; content_type: string; content_text: string | null }) => {
+          const typeLabels: Record<string, string> = {
+            text: 'テキスト',
+            url: 'URL情報',
+            brand_guide: 'ブランドガイドライン',
+            past_work: '過去の制作実績',
+            guideline: '制作ガイドライン',
+          };
+          const label = typeLabels[item.content_type] || item.content_type;
+          return `【${label}】${item.title}\n${item.content_text?.slice(0, 500) || ''}`;
+        });
+        knowledgeContext = `ナレッジベース情報（以下の情報を台本に反映してください）:\n${knowledgeParts.join('\n\n')}`;
+        await addLog(projectId, `ナレッジ ${knowledgeItems.length}件をプロンプトに注入`);
+      }
+    } catch {
+      // Knowledge fetch failure is non-critical
+    }
+
+    // Generate Script
     await updateProjectStatus(projectId, 'scripting');
     await addLog(projectId, '台本作成中...');
 
     const sceneCount = 5;
-    const storyboard = await generateScript(analysis, imageDescriptions, sceneCount, referenceImages.length > 0 ? referenceImages : undefined);
+    const storyboard = await generateScript(analysis, imageDescriptions, sceneCount, referenceImages.length > 0 ? referenceImages : undefined, knowledgeContext || undefined);
     await addLog(projectId, `台本生成完了: 「${storyboard.title}」（${storyboard.scenes.length}シーン）`);
 
     // Save script and create scenes

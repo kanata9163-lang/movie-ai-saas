@@ -1,10 +1,13 @@
 import { NextRequest } from 'next/server';
-import { getSupabase, jsonResponse, errorResponse } from '@/lib/api-helpers';
+import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; clientId: string } }
 ) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
   const db = getSupabase();
   const body = await request.json();
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -15,6 +18,7 @@ export async function PATCH(
     .from('clients')
     .update(updates)
     .eq('id', params.clientId)
+    .eq('workspace_id', auth.workspace.id)
     .select()
     .single();
 
@@ -26,11 +30,15 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; clientId: string } }
 ) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
   const db = getSupabase();
   const { error } = await db
     .from('clients')
     .delete()
-    .eq('id', params.clientId);
+    .eq('id', params.clientId)
+    .eq('workspace_id', auth.workspace.id);
 
   if (error) return errorResponse('db_error', error.message, 500);
   return jsonResponse(null);

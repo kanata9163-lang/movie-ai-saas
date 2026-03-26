@@ -1,10 +1,13 @@
 import { NextRequest } from 'next/server';
-import { getSupabase, jsonResponse, errorResponse, getWorkspaceBySlug } from '@/lib/api-helpers';
+import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; projectId: string } }
 ) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
   const db = getSupabase();
   const url = new URL(request.url);
   const type = url.searchParams.get('type');
@@ -26,9 +29,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string; projectId: string } }
 ) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
   const db = getSupabase();
-  const workspace = await getWorkspaceBySlug(params.workspaceSlug);
-  if (!workspace) return errorResponse('not_found', 'Workspace not found', 404);
   const body = await request.json();
   if (!body.type) return errorResponse('validation', 'type is required');
 
@@ -36,7 +40,7 @@ export async function POST(
     .from('documents')
     .insert({
       project_id: params.projectId,
-      workspace_id: workspace.id,
+      workspace_id: auth.workspace.id,
       type: body.type,
       title: body.title || null,
       url: body.url || null,

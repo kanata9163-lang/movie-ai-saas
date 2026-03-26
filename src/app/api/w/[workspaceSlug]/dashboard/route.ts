@@ -1,13 +1,15 @@
 import { NextRequest } from 'next/server';
-import { getSupabase, jsonResponse, errorResponse, getWorkspaceBySlug } from '@/lib/api-helpers';
+import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string } }
 ) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
   const db = getSupabase();
-  const workspace = await getWorkspaceBySlug(params.workspaceSlug);
-  if (!workspace) return errorResponse('not_found', 'Workspace not found', 404);
+  const workspace = auth.workspace;
 
   // Get active projects with progress
   const { data: projects } = await db

@@ -1,14 +1,14 @@
 import { NextRequest } from 'next/server';
-import { getSupabase, jsonResponse, errorResponse, getWorkspaceBySlug } from '@/lib/api-helpers';
+import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string } }
 ) {
-  const db = getSupabase();
-  const workspace = await getWorkspaceBySlug(params.workspaceSlug);
-  if (!workspace) return errorResponse('not_found', 'Workspace not found', 404);
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
+  const db = getSupabase();
   const url = new URL(request.url);
   const status = url.searchParams.get('status');
   const q = url.searchParams.get('q');
@@ -16,7 +16,7 @@ export async function GET(
   let query = db
     .from('projects')
     .select('*')
-    .eq('workspace_id', workspace.id)
+    .eq('workspace_id', auth.workspace.id)
     .order('created_at', { ascending: false });
 
   if (status) query = query.eq('status', status);
@@ -32,10 +32,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { workspaceSlug: string } }
 ) {
-  const db = getSupabase();
-  const workspace = await getWorkspaceBySlug(params.workspaceSlug);
-  if (!workspace) return errorResponse('not_found', 'Workspace not found', 404);
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
+  const db = getSupabase();
   const body = await request.json();
   const { name, client_id, owner_user_id } = body;
 
@@ -44,7 +44,7 @@ export async function POST(
   const { data, error } = await db
     .from('projects')
     .insert({
-      workspace_id: workspace.id,
+      workspace_id: auth.workspace.id,
       name,
       status: '対応中',
       client_id: client_id || null,
