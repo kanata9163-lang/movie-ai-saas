@@ -101,7 +101,7 @@ export default function LinkToProject({
           <ChevronDown className="w-3 h-3" />
         </button>
         {open && (
-          <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-border rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
+          <div className="absolute top-full right-0 mt-1 w-56 bg-white border border-border rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center py-3">
                 <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
@@ -147,7 +147,7 @@ export default function LinkToProject({
         <ChevronDown className="w-3.5 h-3.5" />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-border rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
+        <div className="absolute top-full right-0 mt-1 w-64 bg-white border border-border rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
