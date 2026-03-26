@@ -151,6 +151,9 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
     finally { setActionLoading(false); }
   };
 
+  const proxyUrl = (sceneId: string, type: 'video' | 'audio' = 'video') =>
+    `/api/w/${workspaceSlug}/video-projects/${videoProjectId}/download-video?sceneId=${sceneId}&type=${type}`;
+
   const handleCompose = async () => {
     if (!project) return;
     const scenesWithVideo = project.scenes.filter(s => s.video_url).sort((a, b) => a.scene_number - b.scene_number);
@@ -160,18 +163,16 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
     setComposeProgress("動画ファイルをダウンロード中...");
 
     try {
-      // Download all video blobs
       const blobs: Blob[] = [];
       for (let i = 0; i < scenesWithVideo.length; i++) {
         const scene = scenesWithVideo[i];
         setComposeProgress(`シーン${scene.scene_number}をダウンロード中... (${i + 1}/${scenesWithVideo.length})`);
-        const resp = await fetch(scene.video_url!);
+        const resp = await fetch(proxyUrl(scene.id));
         if (!resp.ok) throw new Error(`シーン${scene.scene_number}のダウンロード失敗 (${resp.status})`);
         blobs.push(await resp.blob());
       }
 
       setComposeProgress("動画を結合中...");
-      // Concatenate as a single blob (simple binary concat for same-codec MP4s)
       const combined = new Blob(blobs, { type: "video/mp4" });
       const url = URL.createObjectURL(combined);
       setFinalVideoUrl(url);
@@ -190,13 +191,22 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
     const scenesWithVideo = project.scenes.filter(s => s.video_url).sort((a, b) => a.scene_number - b.scene_number);
     for (const scene of scenesWithVideo) {
       const a = document.createElement("a");
-      a.href = scene.video_url!;
+      a.href = proxyUrl(scene.id);
       a.download = `${project.title || "video"}_scene${scene.scene_number}.mp4`;
-      a.target = "_blank";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       await new Promise(r => setTimeout(r, 500));
+      // Also download audio if available
+      if (scene.audio_url) {
+        const a2 = document.createElement("a");
+        a2.href = proxyUrl(scene.id, 'audio');
+        a2.download = `${project.title || "video"}_scene${scene.scene_number}_narration.mp3`;
+        document.body.appendChild(a2);
+        a2.click();
+        document.body.removeChild(a2);
+        await new Promise(r => setTimeout(r, 500));
+      }
     }
   };
 
