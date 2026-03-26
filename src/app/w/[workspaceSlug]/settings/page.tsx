@@ -62,40 +62,45 @@ export default function SettingsPage({ params }: SettingsPageProps) {
       const [settingsRes, membersRes, invitesRes, integrationsRes] = await Promise.all([
         fetch(`/api/w/${workspaceSlug}/settings`),
         fetch(`/api/w/${workspaceSlug}/members`),
-        fetch(`/api/w/${workspaceSlug}/invites`),
-        fetch(`/api/w/${workspaceSlug}/integrations`),
+        fetch(`/api/w/${workspaceSlug}/invites`).catch(() => null),
+        fetch(`/api/w/${workspaceSlug}/integrations`).catch(() => null),
       ]);
 
       const settingsJson = await settingsRes.json();
       const membersJson = await membersRes.json();
-      const invitesJson = await invitesRes.json();
-      const integrationsJson = await integrationsRes.json();
 
       if (settingsJson.ok) {
         setWorkspace(settingsJson.data.workspace);
         setRole(settingsJson.data.role);
         setWorkspaceName(settingsJson.data.workspace.name || "");
       }
-      if (membersJson.ok) setMembers(membersJson.data);
-      if (invitesJson.ok) setInvites(invitesJson.data);
-      if (integrationsJson.ok) {
-        const integrations = integrationsJson.data as Array<{
-          type: string;
-          config: Record<string, string>;
-          enabled: boolean;
-        }>;
-        const slack = integrations.find((i) => i.type === "slack");
-        if (slack) {
-          setSlackEnabled(slack.enabled);
-          setSlackConnected(true);
-          setSlackWebhookUrl(slack.config?.webhook_url || "");
-          setSlackChannel(slack.config?.channel_name || "");
-        }
-        const line = integrations.find((i) => i.type === "line");
-        if (line) {
-          setLineEnabled(line.enabled);
-          setLineConnected(true);
-          setLineToken(line.config?.access_token || "");
+      if (membersJson.ok) setMembers(membersJson.data || []);
+
+      if (invitesRes) {
+        const invitesJson = await invitesRes.json();
+        if (invitesJson.ok) setInvites(invitesJson.data || []);
+      }
+      if (integrationsRes) {
+        const integrationsJson = await integrationsRes.json();
+        if (integrationsJson.ok) {
+          const integrations = integrationsJson.data as Array<{
+            type: string;
+            config: Record<string, string>;
+            enabled: boolean;
+          }>;
+          const slack = integrations.find((i) => i.type === "slack");
+          if (slack) {
+            setSlackEnabled(slack.enabled);
+            setSlackConnected(true);
+            setSlackWebhookUrl(slack.config?.webhook_url || "");
+            setSlackChannel(slack.config?.channel_name || "");
+          }
+          const line = integrations.find((i) => i.type === "line");
+          if (line) {
+            setLineEnabled(line.enabled);
+            setLineConnected(true);
+            setLineToken(line.config?.access_token || "");
+          }
         }
       }
     } catch {
@@ -205,18 +210,19 @@ export default function SettingsPage({ params }: SettingsPageProps) {
         setSlackTesting(false);
         return;
       }
-      const res = await fetch(slackWebhookUrl, {
+      const res = await fetch(`/api/w/${workspaceSlug}/integrations/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: "Mov Manage テスト通知: 接続が正常に動作しています。" }),
+        body: JSON.stringify({ type: "slack", webhook_url: slackWebhookUrl }),
       });
-      if (res.ok) {
-        alert("テスト通知を送信しました");
+      const json = await res.json();
+      if (json.ok) {
+        alert("テスト通知を送信しました！");
       } else {
-        alert("テスト通知の送信に失敗しました。Webhook URLを確認してください。");
+        alert(json.error?.message || "テスト通知の送信に失敗しました。Webhook URLを確認してください。");
       }
     } catch {
-      alert("テスト通知の送信に失敗しました。Webhook URLを確認してください。");
+      alert("テスト通知の送信に失敗しました。");
     } finally {
       setSlackTesting(false);
     }
@@ -256,21 +262,19 @@ export default function SettingsPage({ params }: SettingsPageProps) {
         setLineTesting(false);
         return;
       }
-      const res = await fetch("https://notify-api.line.me/api/notify", {
+      const res = await fetch(`/api/w/${workspaceSlug}/integrations/test`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${lineToken}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: `message=${encodeURIComponent("Mov Manage テスト通知: 接続が正常に動作しています。")}`,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "line", access_token: lineToken }),
       });
-      if (res.ok) {
-        alert("テスト通知を送信しました");
+      const json = await res.json();
+      if (json.ok) {
+        alert("テスト通知を送信しました！");
       } else {
-        alert("テスト通知の送信に失敗しました。アクセストークンを確認してください。");
+        alert(json.error?.message || "テスト通知の送信に失敗しました。アクセストークンを確認してください。");
       }
     } catch {
-      alert("テスト通知の送信に失敗しました。アクセストークンを確認してください。");
+      alert("テスト通知の送信に失敗しました。");
     } finally {
       setLineTesting(false);
     }

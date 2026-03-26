@@ -29,7 +29,7 @@ export async function GET(
 function maskConfig(config: Record<string, unknown>): Record<string, unknown> {
   const masked: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(config)) {
-    if (typeof value === 'string' && value.length > 8) {
+    if (key === 'access_token' && typeof value === 'string' && value.length > 8) {
       masked[key] = value.slice(0, 4) + '****' + value.slice(-4);
     } else {
       masked[key] = value;
@@ -57,6 +57,30 @@ export async function POST(
   }
 
   const db = getSupabase();
+
+  // If config contains masked values, replace with existing values
+  if (config.access_token && typeof config.access_token === 'string' && config.access_token.includes('****')) {
+    const { data: existing } = await db
+      .from('integrations')
+      .select('config')
+      .eq('workspace_id', auth.workspace.id)
+      .eq('type', type)
+      .single();
+    if (existing?.config?.access_token) {
+      config.access_token = existing.config.access_token;
+    }
+  }
+  if (config.webhook_url && typeof config.webhook_url === 'string' && config.webhook_url.includes('****')) {
+    const { data: existing } = await db
+      .from('integrations')
+      .select('config')
+      .eq('workspace_id', auth.workspace.id)
+      .eq('type', type)
+      .single();
+    if (existing?.config?.webhook_url) {
+      config.webhook_url = existing.config.webhook_url;
+    }
+  }
 
   const { data, error } = await db
     .from('integrations')
