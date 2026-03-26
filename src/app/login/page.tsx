@@ -69,7 +69,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-xl font-bold">ログイン</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Video Harness にログイン
+            Vid Harness にログイン
           </p>
         </div>
 

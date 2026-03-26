@@ -47,7 +47,7 @@ export default function SignupPage() {
           </div>
           <h1 className="text-xl font-bold">新規登録</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Video Harness アカウントを作成
+            Vid Harness アカウントを作成
           </p>
         </div>
 

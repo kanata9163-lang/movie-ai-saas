@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: { workspaceSl
       const res = await fetch(webhook_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: '\u2705 Video Harness \u30c6\u30b9\u30c8\u901a\u77e5: \u63a5\u7d9a\u304c\u6b63\u5e38\u306b\u52d5\u4f5c\u3057\u3066\u3044\u307e\u3059\uff01' }),
+        body: JSON.stringify({ text: '\u2705 Vid Harness \u30c6\u30b9\u30c8\u901a\u77e5: \u63a5\u7d9a\u304c\u6b63\u5e38\u306b\u52d5\u4f5c\u3057\u3066\u3044\u307e\u3059\uff01' }),
       });
       if (res.ok) return NextResponse.json({ ok: true });
       const text = await res.text();
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: { workspaceSl
           Authorization: `Bearer ${access_token}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `message=${encodeURIComponent('\u2705 Video Harness \u30c6\u30b9\u30c8\u901a\u77e5: \u63a5\u7d9a\u304c\u6b63\u5e38\u306b\u52d5\u4f5c\u3057\u3066\u3044\u307e\u3059\uff01')}`,
+        body: `message=${encodeURIComponent('\u2705 Vid Harness \u30c6\u30b9\u30c8\u901a\u77e5: \u63a5\u7d9a\u304c\u6b63\u5e38\u306b\u52d5\u4f5c\u3057\u3066\u3044\u307e\u3059\uff01')}`,
       });
       if (res.ok) return NextResponse.json({ ok: true });
       const text = await res.text();

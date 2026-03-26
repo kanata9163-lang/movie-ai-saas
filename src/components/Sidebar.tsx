@@ -133,7 +133,7 @@ export default function Sidebar({ workspaceSlug }: SidebarProps) {
           <div className="w-8 h-8 bg-zinc-900 rounded-md flex items-center justify-center">
             <Film className="w-4 h-4 text-white" />
           </div>
-          <span className="text-base font-bold tracking-tight text-zinc-900">Video Harness</span>
+          <span className="text-base font-bold tracking-tight text-zinc-900">Vid Harness</span>
         </div>
       </div>
 

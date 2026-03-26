@@ -15,7 +15,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Video Harness - AI動画制作プラットフォーム",
+  title: "Vid Harness - AI動画制作プラットフォーム",
   description: "AI絵コンテ生成・動画生成・制作進行プラットフォーム",
   icons: {
     icon: "/favicon.svg",
