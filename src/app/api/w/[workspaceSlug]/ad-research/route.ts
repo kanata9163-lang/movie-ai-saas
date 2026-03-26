@@ -181,9 +181,24 @@ JSONのみを返してください。`;
       }
     );
 
-    if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Gemini API error:', response.status, errText);
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
     const result = await response.json();
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Collect text from all parts (Gemini may split across multiple parts)
+    const parts = result.candidates?.[0]?.content?.parts || [];
+    let text = '';
+    for (const part of parts) {
+      if (part.text) text += part.text;
+    }
+
+    if (!text) {
+      console.error('Gemini returned no text. Full response:', JSON.stringify(result).slice(0, 500));
+      throw new Error('Gemini returned empty response');
+    }
 
     // Extract grounding source URLs from Gemini metadata
     const groundingMeta = result.candidates?.[0]?.groundingMetadata;
@@ -195,15 +210,22 @@ JSONのみを返してください。`;
         }
       }
     }
-    // Also check searchEntryPoint for rendered search results
-    if (groundingMeta?.webSearchQueries) {
-      // Store the search queries used
+
+    // Strip markdown code fences if present
+    const cleanText = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('Failed to extract JSON from Gemini response:', text.slice(0, 300));
+      throw new Error('Invalid response format from Gemini');
     }
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Invalid response from Gemini');
-
-    const parsedResults = JSON.parse(jsonMatch[0]);
+    let parsedResults;
+    try {
+      parsedResults = JSON.parse(jsonMatch[0]);
+    } catch (parseErr) {
+      console.error('JSON parse error:', parseErr, 'Raw:', jsonMatch[0].slice(0, 300));
+      throw new Error('Failed to parse Gemini response as JSON');
+    }
     const insights = parsedResults.overallInsights || null;
 
     // Attach grounding sources as reference URLs
