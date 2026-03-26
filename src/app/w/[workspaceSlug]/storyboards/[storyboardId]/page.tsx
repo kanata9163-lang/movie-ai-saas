@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/lib/useUser";
 import { Badge } from "@/components/ui/badge";
+import ShareButton from "@/components/ShareButton";
 
 interface StoryboardDetailProps {
   params: { workspaceSlug: string; storyboardId: string };
@@ -325,6 +326,7 @@ export default function StoryboardDetailPage({ params }: StoryboardDetailProps) 
               <Video className="w-3.5 h-3.5" />
               動画を作成
             </Button>
+            <ShareButton title={storyboardTitle || "絵コンテ"} text="絵コンテを共有" />
           </div>
         </div>
 

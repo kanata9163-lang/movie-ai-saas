@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import ShareButton from "@/components/ShareButton";
 
 interface VideoDetailProps {
   params: { workspaceSlug: string; videoProjectId: string };
@@ -411,12 +412,13 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                 最終動画
               </h3>
               <video src={finalVideoUrl} controls className="w-full max-w-lg mx-auto rounded-lg shadow-lg" />
-              <div className="flex justify-center mt-4">
+              <div className="flex justify-center gap-2 mt-4">
                 <a href={finalVideoUrl} download={(project.title || "video") + ".mp4"}>
                   <Button variant="outline" size="sm">
                     <Download className="w-4 h-4" />MP4をダウンロード
                   </Button>
                 </a>
+                <ShareButton title={project.title || "動画"} text="動画プロジェクトを共有" />
               </div>
             </div>
           )}

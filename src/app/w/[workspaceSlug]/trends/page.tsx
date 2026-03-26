@@ -19,6 +19,7 @@ import {
   Clapperboard,
 } from "lucide-react";
 import LinkToProject from "@/components/LinkToProject";
+import ShareButton from "@/components/ShareButton";
 
 interface TrendsPageProps {
   params: { workspaceSlug: string };
@@ -179,13 +180,14 @@ export default function TrendsPage({ params }: TrendsPageProps) {
                           {new Date(report.generated_at).toLocaleDateString("ja-JP")} - {rc.summary?.slice(0, 80)}...
                         </p>
                       </div>
-                      <div onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <LinkToProject
                           workspaceSlug={workspaceSlug}
                           resourceType="trend_report"
                           resourceId={report.id}
                           compact
                         />
+                        <ShareButton title={report.topic} text="トレンドレポートを共有" size="sm" variant="ghost" />
                       </div>
                     </div>
                     {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}

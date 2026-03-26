@@ -24,6 +24,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import LinkToProject from "@/components/LinkToProject";
+import ShareButton from "@/components/ShareButton";
 
 interface AdResearchPageProps {
   params: { workspaceSlug: string };
@@ -244,13 +245,14 @@ export default function AdResearchPage({ params }: AdResearchPageProps) {
                           {new Date(analysis.created_at).toLocaleDateString("ja-JP")} - {r.adPatterns?.length || 0}パターン検出
                         </p>
                       </div>
-                      <div onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <LinkToProject
                           workspaceSlug={workspaceSlug}
                           resourceType="ad_analysis"
                           resourceId={analysis.id}
                           compact
                         />
+                        <ShareButton title={analysis.query} text="広告分析を共有" size="sm" variant="ghost" />
                       </div>
                     </div>
                     {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}

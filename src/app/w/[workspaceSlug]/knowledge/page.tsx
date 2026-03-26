@@ -20,6 +20,7 @@ import {
   Tag,
 } from "lucide-react";
 import LinkToProject from "@/components/LinkToProject";
+import ShareButton from "@/components/ShareButton";
 
 interface KnowledgePageProps {
   params: { workspaceSlug: string };
@@ -227,6 +228,7 @@ export default function KnowledgePage({ params }: KnowledgePageProps) {
                     <h3 className="font-semibold text-sm truncate">{item.title}</h3>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ShareButton title={item.title} text="ナレッジを共有" size="sm" variant="ghost" className="h-7 w-7" />
                     <button
                       onClick={() => openEdit(item)}
                       className="p-1 rounded hover:bg-zinc-100 text-muted-foreground"
