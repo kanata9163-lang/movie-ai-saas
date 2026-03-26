@@ -34,6 +34,8 @@ interface CreativeExample {
   visualDescription: string;
   copyText: string;
   whyItWorks: string;
+  sourceUrl?: string;
+  thumbnailUrl?: string;
 }
 
 interface Storyboard {
@@ -62,6 +64,11 @@ interface AdLibraryLink {
   url: string;
 }
 
+interface ReferenceSource {
+  title: string;
+  url: string;
+}
+
 interface AdAnalysis {
   id: string;
   query: string;
@@ -69,6 +76,7 @@ interface AdAnalysis {
   results: {
     adPatterns?: AdPattern[];
     adLibraryLinks?: AdLibraryLink[];
+    referenceSources?: ReferenceSource[];
     overallInsights?: {
       topFormats?: string[];
       colorTrends?: string[];
@@ -319,6 +327,16 @@ export default function AdResearchPage({ params }: AdResearchPageProps) {
                                                 <p className="text-[10px] text-emerald-600 flex items-center gap-1">
                                                   <CheckCircle className="w-3 h-3" />{ex.whyItWorks}
                                                 </p>
+                                                {ex.sourceUrl && ex.sourceUrl.startsWith('http') && (
+                                                  <a
+                                                    href={ex.sourceUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
+                                                  >
+                                                    <ExternalLink className="w-3 h-3" />参考リンク
+                                                  </a>
+                                                )}
                                               </div>
                                             ))}
                                           </div>
@@ -447,6 +465,27 @@ export default function AdResearchPage({ params }: AdResearchPageProps) {
                                 <p className="font-medium text-sm mb-1">{rec.title}</p>
                                 <p className="text-xs text-muted-foreground">{rec.description}</p>
                               </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Reference Sources */}
+                      {r.referenceSources && r.referenceSources.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">参考ソース</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {r.referenceSources.map((src, i) => (
+                              <a
+                                key={i}
+                                href={src.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] text-zinc-600 bg-zinc-50 border border-zinc-200 rounded-md hover:bg-zinc-100 hover:text-zinc-800 transition-colors max-w-xs truncate"
+                              >
+                                <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">{src.title}</span>
+                              </a>
                             ))}
                           </div>
                         </div>

@@ -128,7 +128,9 @@ export async function POST(req: NextRequest, { params }: { params: { workspaceSl
           "adFormat": "動画広告/カルーセル/静止画等",
           "visualDescription": "クリエイティブの視覚的な説明（画面構成、色使い、テキスト配置など）を50文字以上で詳しく",
           "copyText": "実際の広告コピー例",
-          "whyItWorks": "なぜこのクリエイティブが効果的なのか"
+          "whyItWorks": "なぜこのクリエイティブが効果的なのか",
+          "sourceUrl": "この広告事例の参考URL（記事やSNS投稿のURL）があれば記載",
+          "thumbnailUrl": "広告のサムネイル画像URL（見つかれば記載、なければ空文字）"
         }
       ],
       "keyElements": {
@@ -183,11 +185,29 @@ JSONのみを返してください。`;
     const result = await response.json();
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
+    // Extract grounding source URLs from Gemini metadata
+    const groundingMeta = result.candidates?.[0]?.groundingMetadata;
+    const groundingSources: { title: string; url: string }[] = [];
+    if (groundingMeta?.groundingChunks) {
+      for (const chunk of groundingMeta.groundingChunks) {
+        if (chunk.web?.uri && chunk.web?.title) {
+          groundingSources.push({ title: chunk.web.title, url: chunk.web.uri });
+        }
+      }
+    }
+    // Also check searchEntryPoint for rendered search results
+    if (groundingMeta?.webSearchQueries) {
+      // Store the search queries used
+    }
+
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Invalid response from Gemini');
 
     const parsedResults = JSON.parse(jsonMatch[0]);
     const insights = parsedResults.overallInsights || null;
+
+    // Attach grounding sources as reference URLs
+    parsedResults.referenceSources = groundingSources;
 
     // 2. Generate mockup images for top 2 patterns (parallel)
     const patterns = parsedResults.adPatterns || [];
