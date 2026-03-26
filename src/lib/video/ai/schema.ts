@@ -10,6 +10,7 @@ export const StoryboardSceneSchema = z.object({
 
 export const StoryboardSchema = z.object({
   title: z.string(),
+  visualStyle: z.string().optional().default(''),
   scenes: z.array(StoryboardSceneSchema).min(1).max(10),
 });
 

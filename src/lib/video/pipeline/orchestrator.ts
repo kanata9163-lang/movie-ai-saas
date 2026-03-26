@@ -115,6 +115,7 @@ export async function runAnalyzeAndScript(projectId: string) {
     await addLog(projectId, `台本生成完了: 「${storyboard.title}」（${storyboard.scenes.length}シーン）`);
 
     // Save script and create scenes
+    const visualStyle = storyboard.visualStyle || '';
     await supabase.from('video_projects').update({
       script: storyboard,
       title: storyboard.title || project.title,
@@ -122,12 +123,21 @@ export async function runAnalyzeAndScript(projectId: string) {
       updated_at: new Date().toISOString(),
     }).eq('id', projectId);
 
+    if (visualStyle) {
+      await addLog(projectId, `ビジュアルスタイル: ${visualStyle.slice(0, 80)}...`);
+    }
+
     for (const scene of storyboard.scenes) {
+      // Prepend visual style to each image prompt for consistency
+      const imagePrompt = visualStyle
+        ? `CONSISTENT STYLE: ${visualStyle}. SCENE: ${scene.imagePrompt ?? ''}`
+        : scene.imagePrompt ?? '';
+
       await supabase.from('video_scenes').insert({
         video_project_id: projectId,
         scene_number: scene.sceneNumber ?? 1,
         narration_text: scene.narrationText ?? '',
-        image_prompt: scene.imagePrompt ?? '',
+        image_prompt: imagePrompt,
         description: scene.visualDescription ?? '',
         duration: scene.durationSeconds ?? 5,
         status: 'pending',
@@ -169,7 +179,13 @@ export async function runImageGeneration(projectId: string) {
     const completedBefore = scenes.filter((s: { status: string }) => s.status === 'image_ready').length;
     await addLog(projectId, `シーン${scene.scene_number}/${scenes.length} 画像生成中...`);
 
-    const imageBuffer = await generateVideoImage(scene.image_prompt, aspectRatio, refImages.length > 0 ? refImages : undefined);
+    // Build scene context for visual consistency
+    const otherScenes = scenes
+      .filter((s: { id: string }) => s.id !== scene.id)
+      .map((s: { scene_number: number; image_prompt: string }) => `Scene ${s.scene_number}: ${s.image_prompt?.slice(0, 100)}`)
+      .join('\n');
+
+    const imageBuffer = await generateVideoImage(scene.image_prompt, aspectRatio, refImages.length > 0 ? refImages : undefined, otherScenes || undefined);
 
     // Upload to Supabase Storage
     const path = `video/${projectId}/scenes/${scene.scene_number}.png`;
