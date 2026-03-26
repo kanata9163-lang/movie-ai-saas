@@ -161,7 +161,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
 
     try {
       const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-      const { fetchFile, toBlobURL } = await import("@ffmpeg/util");
+      const { toBlobURL } = await import("@ffmpeg/util");
 
       const ffmpeg = new FFmpeg();
       ffmpeg.on("log", ({ message }: { message: string }) => console.log("[ffmpeg]", message));
@@ -183,7 +183,12 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
         setComposeProgress("シーン" + scene.scene_number + "をダウンロード中... (" + (i + 1) + "/" + scenesWithVideo.length + ")");
         const name = "scene" + i + ".mp4";
         fileNames.push(name);
-        await ffmpeg.writeFile(name, await fetchFile(scene.video_url!));
+        // Use fetch with no-cors fallback for COEP compatibility
+        const resp = await fetch(scene.video_url!, { mode: "cors" }).catch(() =>
+          fetch(scene.video_url!)
+        );
+        const buf = await resp.arrayBuffer();
+        await ffmpeg.writeFile(name, new Uint8Array(buf));
       }
 
       const concatList = fileNames.map(n => "file '" + n + "'").join("\n");
@@ -202,7 +207,8 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
       await ffmpeg.deleteFile("filelist.txt");
       await ffmpeg.deleteFile("output.mp4");
     } catch (e) {
-      alert("動画結合に失敗しました: " + (e instanceof Error ? e.message : ""));
+      console.error("Compose error:", e);
+      alert("動画結合に失敗しました: " + (e instanceof Error ? e.message : String(e)));
       setComposeProgress("");
     } finally {
       setComposing(false);
