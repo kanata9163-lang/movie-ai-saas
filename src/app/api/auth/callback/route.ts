@@ -31,9 +31,11 @@ export async function GET(request: NextRequest) {
   let workspaceSlug = '';
 
   if (!memberships || memberships.length === 0) {
-    // Create workspace for new Google user
+    // Create workspace for new Google user with unique slug
+    const { v4: uuidv4 } = await import('uuid');
     const displayName = data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'user';
-    const slug = displayName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20) || 'workspace';
+    const baseSlug = displayName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 12) || 'ws';
+    const slug = `${baseSlug}-${uuidv4().slice(0, 8)}`;
 
     const { data: ws } = await db
       .from('workspaces')

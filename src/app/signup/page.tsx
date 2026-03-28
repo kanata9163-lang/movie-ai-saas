@@ -29,7 +29,10 @@ export default function SignupPage() {
       if (!json.ok) {
         throw new Error(json.error?.message || "登録に失敗しました");
       }
-      const slug = json.data?.workspaceSlug || "demo";
+      const slug = json.data?.workspaceSlug;
+      if (!slug) {
+        throw new Error("ワークスペースの作成に失敗しました。もう一度お試しください。");
+      }
       router.push(`/w/${slug}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "登録に失敗しました");

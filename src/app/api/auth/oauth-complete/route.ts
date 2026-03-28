@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {
   const { access_token, refresh_token, user_id, provider_token, provider_refresh_token } = await request.json();
@@ -24,34 +25,24 @@ export async function POST(request: NextRequest) {
     // Look up user info
     const { data: userData } = await db.auth.admin.getUserById(user_id);
     const displayName = userData?.user?.user_metadata?.full_name || userData?.user?.email?.split('@')[0] || 'user';
-    const slug = displayName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 20) || 'workspace';
+    // Always generate a unique slug using UUID to prevent collision
+    const baseSlug = displayName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 12) || 'ws';
+    const slug = `${baseSlug}-${uuidv4().slice(0, 8)}`;
 
-    // Check if slug exists
-    const { data: existingWs } = await db.from('workspaces').select('id').eq('slug', slug).single();
+    // Always create a NEW workspace - never join an existing one by slug collision
+    const { data: ws } = await db
+      .from('workspaces')
+      .insert({ name: `${displayName}のワークスペース`, slug })
+      .select()
+      .single();
 
-    if (existingWs) {
-      // Join existing workspace
+    if (ws) {
       await db.from('workspace_members').insert({
-        workspace_id: existingWs.id,
+        workspace_id: ws.id,
         user_id: user_id,
-        role: 'member',
+        role: 'owner',
       });
-      workspaceSlug = slug;
-    } else {
-      const { data: ws } = await db
-        .from('workspaces')
-        .insert({ name: `${displayName}のワークスペース`, slug })
-        .select()
-        .single();
-
-      if (ws) {
-        await db.from('workspace_members').insert({
-          workspace_id: ws.id,
-          user_id: user_id,
-          role: 'owner',
-        });
-        workspaceSlug = ws.slug;
-      }
+      workspaceSlug = ws.slug;
     }
   } else {
     const ws = (memberships[0] as Record<string, unknown>).workspaces as { slug: string } | null;
