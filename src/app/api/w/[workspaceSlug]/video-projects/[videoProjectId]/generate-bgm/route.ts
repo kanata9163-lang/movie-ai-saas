@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { getWorkspaceWithAuth, errorResponse } from '@/lib/api-helpers';
 import { generateBGM } from '@/lib/video/api/bgm';
+import { checkAndDeductCredits } from '@/lib/credit-check';
 
 export const maxDuration = 120;
 
 export async function POST(req: NextRequest, { params }: { params: { workspaceSlug: string; videoProjectId: string } }) {
   const auth = await getWorkspaceWithAuth(params.workspaceSlug, req);
   if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
+  const creditError = await checkAndDeductCredits(auth.workspace.id as string, 'BGM_GENERATION', 'BGM生成');
+  if (creditError) return creditError;
 
   const supabase = createServerClient();
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
+import { initializeCredits } from '@/lib/credits';
 
 export async function POST(request: NextRequest) {
   const { access_token, refresh_token, user_id, provider_token, provider_refresh_token } = await request.json();
@@ -43,6 +44,8 @@ export async function POST(request: NextRequest) {
         role: 'owner',
       });
       workspaceSlug = ws.slug;
+      // Grant initial free credits
+      await initializeCredits(ws.id);
     }
   } else {
     const ws = (memberships[0] as Record<string, unknown>).workspaces as { slug: string } | null;

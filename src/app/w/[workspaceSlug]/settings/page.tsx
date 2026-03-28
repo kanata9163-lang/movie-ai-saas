@@ -5,8 +5,9 @@ import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/lib/useUser";
-import { Settings, Users, Link2, Loader2, Trash2, Copy, Check, MessageSquare, Zap, Send } from "lucide-react";
+import { Settings, Users, Link2, Loader2, Trash2, Copy, Check, MessageSquare, Zap, Send, Coins, CreditCard, ArrowDownRight, ArrowUpRight } from "lucide-react";
 import LoadingAnimation from "@/components/LoadingAnimation";
+import { CREDIT_COSTS } from "@/lib/stripe";
 
 interface SettingsPageProps {
   params: { workspaceSlug: string };
@@ -57,6 +58,15 @@ export default function SettingsPage({ params }: SettingsPageProps) {
   const [lineTesting, setLineTesting] = useState(false);
   const [lineConnected, setLineConnected] = useState(false);
 
+  // Credits state
+  const [creditBalance, setCreditBalance] = useState(0);
+  const [creditTransactions, setCreditTransactions] = useState<Array<{
+    id: string; amount: number; balance_after: number; type: string; description: string; created_at: string;
+  }>>([]);
+  const [buyAmount, setBuyAmount] = useState("1000");
+  const [buying, setBuying] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState("");
+
   const loadData = async () => {
     try {
       const [settingsRes, membersRes, invitesRes, integrationsRes] = await Promise.all([
@@ -73,7 +83,18 @@ export default function SettingsPage({ params }: SettingsPageProps) {
         setWorkspace(settingsJson.data.workspace);
         setRole(settingsJson.data.role);
         setWorkspaceName(settingsJson.data.workspace.name || "");
+        setWorkspaceId(settingsJson.data.workspace.id || "");
       }
+
+      // Load credits
+      try {
+        const creditsRes = await fetch(`/api/w/${workspaceSlug}/credits`);
+        const creditsJson = await creditsRes.json();
+        if (creditsJson.ok) {
+          setCreditBalance(creditsJson.data.balance);
+          setCreditTransactions(creditsJson.data.transactions || []);
+        }
+      } catch {}
       if (membersJson.ok) setMembers(membersJson.data || []);
 
       if (invitesRes) {
@@ -610,6 +631,147 @@ export default function SettingsPage({ params }: SettingsPageProps) {
             </div>
           </section>
         )}
+        {/* Credits & Billing */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Coins className="w-5 h-5 text-amber-500" />
+            <h2 className="text-base font-semibold">クレジット & 課金</h2>
+          </div>
+
+          {/* Balance Card */}
+          <div className="rounded-xl border border-border bg-card p-5 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm text-muted-foreground">クレジット残高</p>
+                <p className="text-3xl font-bold text-foreground">{creditBalance.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">1クレジット = ¥1</p>
+              </div>
+              <div className="w-14 h-14 rounded-xl bg-amber-50 flex items-center justify-center">
+                <Coins className="w-7 h-7 text-amber-600" />
+              </div>
+            </div>
+
+            {/* Buy credits */}
+            <div className="border-t border-border pt-4">
+              <p className="text-sm font-medium mb-2">クレジット購入</p>
+              <div className="flex gap-2 mb-3">
+                {["500", "1000", "3000", "5000", "10000"].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => setBuyAmount(amount)}
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                      buyAmount === amount
+                        ? "border-amber-500 bg-amber-50 text-amber-700 font-medium"
+                        : "border-border hover:bg-muted"
+                    }`}
+                  >
+                    {parseInt(amount).toLocaleString()}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number"
+                  value={buyAmount}
+                  onChange={(e) => setBuyAmount(e.target.value)}
+                  min={100}
+                  max={100000}
+                  className="max-w-[140px]"
+                />
+                <span className="text-sm text-muted-foreground">
+                  = ¥{parseInt(buyAmount || "0").toLocaleString()}
+                </span>
+                <Button
+                  onClick={async () => {
+                    setBuying(true);
+                    try {
+                      const res = await fetch("/api/stripe/checkout", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          credits: parseInt(buyAmount),
+                          workspaceId,
+                          workspaceSlug,
+                        }),
+                      });
+                      const json = await res.json();
+                      if (json.ok && json.data?.url) {
+                        window.location.href = json.data.url;
+                      } else {
+                        alert(json.error || "決済の開始に失敗しました");
+                      }
+                    } catch {
+                      alert("決済の開始に失敗しました");
+                    } finally {
+                      setBuying(false);
+                    }
+                  }}
+                  disabled={buying || !buyAmount || parseInt(buyAmount) < 100}
+                  className="gap-1.5"
+                >
+                  {buying ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CreditCard className="w-4 h-4" />
+                  )}
+                  購入する
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Cost Table */}
+          <div className="rounded-xl border border-border bg-card p-5 mb-4">
+            <p className="text-sm font-medium mb-3">クレジット消費量</p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {[
+                ["画像生成（1枚）", CREDIT_COSTS.IMAGE_GENERATION],
+                ["動画生成（1シーン）", CREDIT_COSTS.VIDEO_GENERATION],
+                ["ナレーション生成", CREDIT_COSTS.NARRATION],
+                ["BGM生成", CREDIT_COSTS.BGM_GENERATION],
+                ["絵コンテ生成", CREDIT_COSTS.STORYBOARD_GENERATION],
+                ["URL解析+台本", CREDIT_COSTS.URL_ANALYSIS],
+              ].map(([label, cost]) => (
+                <div key={label as string} className="flex justify-between py-1.5 px-2 rounded hover:bg-muted/50">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span className="font-medium">{(cost as number).toLocaleString()} cr</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Transaction History */}
+          {creditTransactions.length > 0 && (
+            <div className="rounded-xl border border-border bg-card p-5">
+              <p className="text-sm font-medium mb-3">取引履歴</p>
+              <div className="divide-y divide-border">
+                {creditTransactions.map((tx) => (
+                  <div key={tx.id} className="flex items-center justify-between py-2.5">
+                    <div className="flex items-center gap-2">
+                      {tx.amount > 0 ? (
+                        <ArrowUpRight className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <ArrowDownRight className="w-4 h-4 text-red-400" />
+                      )}
+                      <div>
+                        <p className="text-sm">{tx.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(tx.created_at).toLocaleString("ja-JP")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-medium ${tx.amount > 0 ? "text-green-600" : "text-red-500"}`}>
+                        {tx.amount > 0 ? "+" : ""}{tx.amount.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">残高: {tx.balance_after.toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
       </main>
     </>
   );

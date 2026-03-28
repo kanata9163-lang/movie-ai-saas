@@ -1,8 +1,8 @@
 "use client";
 
-import { Bell, LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Bell, LogOut, Coins } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 
 function formatDate(date: Date): string {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -23,7 +23,22 @@ export default function Header({ title, userEmail }: HeaderProps) {
   const today = new Date();
   const dateStr = formatDate(today);
   const router = useRouter();
+  const pathname = usePathname();
   const [showMenu, setShowMenu] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
+
+  // Extract workspace slug from pathname
+  const workspaceSlug = pathname?.match(/\/w\/([^/]+)/)?.[1] || '';
+
+  useEffect(() => {
+    if (!workspaceSlug) return;
+    fetch(`/api/w/${workspaceSlug}/credits`)
+      .then(res => res.json())
+      .then(json => {
+        if (json.ok) setCredits(json.data.balance);
+      })
+      .catch(() => {});
+  }, [workspaceSlug]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -38,6 +53,18 @@ export default function Header({ title, userEmail }: HeaderProps) {
         )}
       </div>
       <div className="flex items-center gap-3">
+        {/* Credit balance */}
+        {credits !== null && workspaceSlug && (
+          <button
+            onClick={() => router.push(`/w/${workspaceSlug}/settings?tab=billing`)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 transition-colors border border-amber-200"
+          >
+            <Coins className="w-3.5 h-3.5 text-amber-600" />
+            <span className="text-sm font-semibold text-amber-700">
+              {credits.toLocaleString()}
+            </span>
+          </button>
+        )}
         {/* Email button */}
         <div className="relative">
           <button

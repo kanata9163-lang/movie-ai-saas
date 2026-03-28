@@ -371,6 +371,16 @@ export const api = {
   deleteIntegration: (slug: string, type: string) =>
     fetchAPI<null>(`/api/w/${slug}/integrations?type=${type}`, { method: 'DELETE' }),
 
+  // Credits
+  getCredits: (slug: string) =>
+    fetchAPI<{ balance: number; transactions: Array<{ id: string; amount: number; balance_after: number; type: string; description: string; created_at: string }> }>(`/api/w/${slug}/credits`),
+
+  buyCredits: (credits: number, workspaceId: string, workspaceSlug: string) =>
+    fetchAPI<{ url: string }>('/api/stripe/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ credits, workspaceId, workspaceSlug }),
+    }),
+
   // Auth
   login: (email: string, password: string) =>
     fetchAPI<{ user: unknown; session: unknown }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),

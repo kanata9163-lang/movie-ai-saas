@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getSupabase, jsonResponse, errorResponse, getWorkspaceWithAuth } from '@/lib/api-helpers';
 import { generateSceneImage, type ReferenceImage } from '@/lib/gemini';
+import { checkAndDeductCredits } from '@/lib/credit-check';
 
 export const maxDuration = 60;
 
@@ -10,6 +11,9 @@ export async function POST(
 ) {
   const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
   if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
+  const creditError = await checkAndDeductCredits(auth.workspace.id as string, 'IMAGE_GENERATION', '絵コンテ画像生成');
+  if (creditError) return creditError;
 
   const db = getSupabase();
 

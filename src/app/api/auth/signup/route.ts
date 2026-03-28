@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
+import { initializeCredits } from '@/lib/credits';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -66,6 +67,8 @@ export async function POST(request: NextRequest) {
       user_id: adminData.user.id,
       role: 'owner',
     });
+    // Grant initial free credits (1000)
+    await initializeCredits(workspace.id);
   }
 
   // Sign in the user to get a session
