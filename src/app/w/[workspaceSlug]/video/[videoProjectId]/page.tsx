@@ -71,6 +71,7 @@ interface VideoProject {
   script: { title: string; scenes: unknown[] } | null;
   pipeline_logs: string[];
   error_message: string | null;
+  ad_prediction: any | null;
   scenes: Scene[];
   company_analysis: {
     companyName?: string;
@@ -136,6 +137,8 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
   const [regeneratingAudioSceneId, setRegeneratingAudioSceneId] = useState<string | null>(null);
   const [generatingBGM, setGeneratingBGM] = useState(false);
   const [bgmUrl, setBgmUrl] = useState<string | null>(null);
+  const [predicting, setPredicting] = useState(false);
+  const [prediction, setPrediction] = useState<any>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -143,6 +146,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
     const res = await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}`);
     const { data } = await res.json();
     setProject(data);
+    if (data?.ad_prediction) setPrediction(data.ad_prediction);
     setLoading(false);
   };
 
@@ -555,6 +559,23 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
     }
   };
 
+  const handlePredictPerformance = async () => {
+    setPredicting(true);
+    try {
+      const res = await fetch(`/api/w/${workspaceSlug}/video-projects/${videoProjectId}/predict-performance`, { method: 'POST' });
+      const result = await res.json();
+      if (result.ok) {
+        setPrediction(result.data);
+      } else {
+        alert(`予測失敗: ${result.error || '不明なエラー'}`);
+      }
+    } catch {
+      alert('パフォーマンス予測に失敗しました');
+    } finally {
+      setPredicting(false);
+    }
+  };
+
   const handleDownloadAll = async () => {
     if (!project) return;
     const scenesWithVideo = project.scenes.filter(s => s.video_url).sort((a, b) => a.scene_number - b.scene_number);
@@ -781,6 +802,10 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
             )}
             {project.scenes.some(s => s.video_url) && (
               <>
+                <Button onClick={handlePredictPerformance} disabled={predicting} className="bg-indigo-600 text-white hover:bg-indigo-700 h-11 px-6">
+                  {predicting ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
+                  {prediction ? 'パフォーマンス再予測' : 'Meta広告パフォーマンス予測'}
+                </Button>
                 <Button onClick={handleGenerateBGM} disabled={generatingBGM} className="bg-purple-600 text-white hover:bg-purple-700 h-11 px-6">
                   {generatingBGM ? <Loader2 className="w-4 h-4 animate-spin" /> : <Music className="w-4 h-4" />}
                   {bgmUrl ? 'BGMを再生成' : 'BGMを生成'}（Gemini AI）
@@ -823,6 +848,120 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                 </a>
                 <ShareButton title={project.title || "動画"} text="動画プロジェクトを共有" />
               </div>
+            </div>
+          )}
+
+          {/* Ad Performance Prediction */}
+          {prediction && (
+            <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50/50 p-6 mb-8">
+              <h3 className="font-bold text-sm mb-4 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-indigo-600" />
+                Meta広告パフォーマンス予測
+              </h3>
+
+              {/* Overall Score */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-white ${
+                  prediction.overallScore >= 80 ? 'bg-green-500' : prediction.overallScore >= 60 ? 'bg-amber-500' : 'bg-red-500'
+                }`}>
+                  {prediction.overallScore}
+                </div>
+                <div>
+                  <p className="text-lg font-bold">{prediction.scoreLabel || '評価'}</p>
+                  <p className="text-xs text-muted-foreground">総合スコア（0-100）</p>
+                </div>
+              </div>
+
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                {prediction.metrics && Object.entries(prediction.metrics).map(([key, val]: [string, any]) => {
+                  const labels: Record<string, string> = {
+                    ctr: 'CTR', cpm: 'CPM', cpc: 'CPC', cvr: 'CVR',
+                    hookRate: 'フック率', completionRate: '完視聴率', cpa: 'CPA'
+                  };
+                  const verdictColors: Record<string, string> = {
+                    above: 'text-green-600', below: 'text-red-500', average: 'text-amber-600'
+                  };
+                  return (
+                    <div key={key} className="bg-white rounded-lg p-3 border border-indigo-100">
+                      <p className="text-[10px] text-muted-foreground mb-1">{labels[key] || key}</p>
+                      <p className={`text-lg font-bold ${verdictColors[val.verdict] || ''}`}>{val.predicted}</p>
+                      <p className="text-[10px] text-muted-foreground">業界平均: {val.benchmark}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Strengths & Weaknesses */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                {prediction.strengths?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-green-700 mb-2">強み</p>
+                    <ul className="space-y-1">
+                      {prediction.strengths.map((s: string, i: number) => (
+                        <li key={i} className="text-xs flex items-start gap-1.5">
+                          <Check className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {prediction.weaknesses?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-red-600 mb-2">改善点</p>
+                    <ul className="space-y-1">
+                      {prediction.weaknesses.map((w: string, i: number) => (
+                        <li key={i} className="text-xs flex items-start gap-1.5">
+                          <AlertCircle className="w-3 h-3 text-red-400 mt-0.5 flex-shrink-0" />
+                          {w}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Recommendations */}
+              {prediction.recommendations?.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-indigo-700 mb-2">改善提案</p>
+                  <div className="space-y-1.5">
+                    {prediction.recommendations.map((r: string, i: number) => (
+                      <p key={i} className="text-xs bg-white rounded p-2 border border-indigo-100">💡 {r}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Competitor Insights */}
+              {prediction.competitorInsights?.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs font-semibold text-indigo-700 mb-2">競合情報</p>
+                  <div className="space-y-1.5">
+                    {prediction.competitorInsights.map((c: any, i: number) => (
+                      <div key={i} className="text-xs bg-white rounded p-2 border border-indigo-100">
+                        <p className="font-medium">{c.insight}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">出典: {c.source}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sources */}
+              {prediction.sources?.length > 0 && (
+                <div className="pt-3 border-t border-indigo-200">
+                  <p className="text-[10px] text-muted-foreground mb-1">参照データソース:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {prediction.sources.slice(0, 5).map((s: any, i: number) => (
+                      <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="text-[9px] text-indigo-500 hover:underline bg-white rounded px-1.5 py-0.5 border border-indigo-100">
+                        {s.title || s.url}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
