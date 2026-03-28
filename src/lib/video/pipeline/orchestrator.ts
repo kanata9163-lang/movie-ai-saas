@@ -2,7 +2,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { analyzeCompanyUrl, generateScript, ReferenceImage } from '../ai/gemini';
 import { generateVideoImage, ReferenceImageData } from '../api/image-gen';
 import { createVideoFromImage, checkTaskStatus } from '../api/byteplus';
-import { generateNarration } from '../api/elevenlabs';
+import { generateNarration, VoiceStyle } from '../api/elevenlabs';
 
 async function updateProjectStatus(projectId: string, status: string, errorMessage?: string) {
   const supabase = createServerClient();
@@ -52,15 +52,27 @@ export async function runAnalyzeAndScript(projectId: string) {
 
     await supabase.from('video_projects').update({ pipeline_logs: [] }).eq('id', projectId);
 
-    // Step 1: Analyze URL
-    await updateProjectStatus(projectId, 'analyzing');
-    await addLog(projectId, `URL解析を開始: ${project.source_url}`);
-
-    const analysis = await analyzeCompanyUrl(project.source_url);
-    await addLog(projectId, `URL解析完了: 「${analysis.companyName || '不明'}」を検出`);
-
-    // Save analysis
-    await supabase.from('video_projects').update({ company_analysis: analysis }).eq('id', projectId);
+    // Step 1: Analyze URL (or skip if no URL)
+    let analysis;
+    if (project.source_url) {
+      await updateProjectStatus(projectId, 'analyzing');
+      await addLog(projectId, `URL解析を開始: ${project.source_url}`);
+      analysis = await analyzeCompanyUrl(project.source_url);
+      await addLog(projectId, `URL解析完了: 「${analysis.companyName || '不明'}」を検出`);
+      await supabase.from('video_projects').update({ company_analysis: analysis }).eq('id', projectId);
+    } else {
+      await updateProjectStatus(projectId, 'analyzing');
+      await addLog(projectId, 'URL未指定のため、タイトルと指示内容から台本を作成します');
+      analysis = {
+        companyName: project.title || '未指定',
+        industry: '',
+        products: [],
+        targetAudience: '',
+        tone: '',
+        keyMessages: [],
+        description: project.custom_instructions || project.title || '',
+      };
+    }
 
     // Reference images
     const { data: refImages } = await supabase.from('video_reference_images').select('*').eq('video_project_id', projectId);
@@ -104,6 +116,12 @@ export async function runAnalyzeAndScript(projectId: string) {
       }
     } catch {
       // Knowledge fetch failure is non-critical
+    }
+
+    // Add custom instructions if provided
+    if (project.custom_instructions) {
+      knowledgeContext = (knowledgeContext ? knowledgeContext + '\n\n' : '') +
+        `制作者からの追加指示（必ず反映してください）:\n${project.custom_instructions}`;
     }
 
     // Generate Script
@@ -324,8 +342,9 @@ export async function runNarrationGeneration(projectId: string) {
     await updateProjectStatus(projectId, 'generating_audio');
     await addLog(projectId, 'ナレーション生成開始...');
 
-    const { data: project } = await supabase.from('video_projects').select('voice_type').eq('id', projectId).single();
+    const { data: project } = await supabase.from('video_projects').select('voice_type, voice_style').eq('id', projectId).single();
     const gender = (project?.voice_type || 'female') as 'male' | 'female';
+    const voiceStyle = (project?.voice_style || 'energetic') as VoiceStyle;
 
     const { data: scenes } = await supabase.from('video_scenes').select('*').eq('video_project_id', projectId).order('scene_number');
     if (!scenes || scenes.length === 0) throw new Error('No scenes found');
@@ -343,7 +362,7 @@ export async function runNarrationGeneration(projectId: string) {
       }
 
       try {
-        const audioBuffer = await generateNarration(narrationText, gender);
+        const audioBuffer = await generateNarration(narrationText, gender, voiceStyle);
 
         // Estimate audio duration from MP3 buffer size
         // MP3 at ~128kbps: duration ≈ (bytes * 8) / 128000

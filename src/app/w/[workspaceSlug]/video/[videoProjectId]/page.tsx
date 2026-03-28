@@ -53,6 +53,8 @@ interface VideoProject {
   source_url: string;
   aspect_ratio: string;
   voice_type: string;
+  voice_style: string;
+  custom_instructions: string;
   script: { title: string; scenes: unknown[] } | null;
   pipeline_logs: string[];
   error_message: string | null;
@@ -473,7 +475,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
 
           <h1 className="text-xl font-bold mb-1">{project.title || '無題'}</h1>
           <p className="text-sm text-muted-foreground mb-8">
-            {project.source_url} / {project.aspect_ratio} / {project.voice_type === 'female' ? '女性' : '男性'}ナレーション / {project.scenes.length}シーン
+            {project.source_url && <>{project.source_url} / </>}{project.aspect_ratio} / {project.voice_type === 'female' ? '女性' : '男性'}ナレーション（{({elegant: 'ゆっくり上品', energetic: '元気に広告風', speedy: 'スピーディー', brand: '大人っぽく洗練'} as Record<string, string>)[project.voice_style] || project.voice_style}） / {project.scenes.length}シーン
           </p>
 
           {/* Step Indicator (storyboard style) */}

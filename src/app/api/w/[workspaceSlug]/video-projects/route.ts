@@ -32,9 +32,11 @@ export async function POST(req: NextRequest, { params }: { params: { workspaceSl
       workspace_id: auth.workspace.id,
       project_id: body.project_id || null,
       title: body.title || '',
-      source_url: body.source_url || '',
+      source_url: body.source_url || null,
       aspect_ratio: body.aspect_ratio || '9:16',
       voice_type: body.voice_type || 'female',
+      voice_style: body.voice_style || 'energetic',
+      custom_instructions: body.custom_instructions || '',
       status: 'pending',
     })
     .select()

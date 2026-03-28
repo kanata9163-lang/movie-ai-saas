@@ -34,6 +34,8 @@ export default function NewVideoPage({ params }: NewVideoProps) {
   const [sourceUrl, setSourceUrl] = useState(searchParams.get("url") || "");
   const [aspectRatio, setAspectRatio] = useState("9:16");
   const [voiceType, setVoiceType] = useState("female");
+  const [voiceStyle, setVoiceStyle] = useState("energetic");
+  const [customInstructions, setCustomInstructions] = useState("");
   const [refImages, setRefImages] = useState<RefImage[]>([]);
   const [creating, setCreating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,7 +79,7 @@ export default function NewVideoPage({ params }: NewVideoProps) {
   };
 
   const handleCreate = async () => {
-    if (!sourceUrl) return alert("URLを入力してください");
+    if (!sourceUrl && !title) return alert("URLまたはタイトルを入力してください");
     setCreating(true);
 
     try {
@@ -85,7 +87,7 @@ export default function NewVideoPage({ params }: NewVideoProps) {
       const res = await fetch(`/api/w/${workspaceSlug}/video-projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, source_url: sourceUrl, aspect_ratio: aspectRatio, voice_type: voiceType }),
+        body: JSON.stringify({ title, source_url: sourceUrl, aspect_ratio: aspectRatio, voice_type: voiceType, voice_style: voiceStyle, custom_instructions: customInstructions }),
       });
       const { data: project } = await res.json();
 
@@ -139,7 +141,7 @@ export default function NewVideoPage({ params }: NewVideoProps) {
 
             {/* URL */}
             <div>
-              <label className="text-sm font-medium block mb-1.5">参照URL <span className="text-red-500">*</span></label>
+              <label className="text-sm font-medium block mb-1.5">参照URL（任意）</label>
               <div className="relative">
                 <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -150,7 +152,7 @@ export default function NewVideoPage({ params }: NewVideoProps) {
                   className="w-full pl-9 pr-4 py-2.5 text-sm border border-border rounded-lg bg-background"
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">企業サイトや商品ページのURLを入力</p>
+              <p className="text-xs text-muted-foreground mt-1">企業サイトや商品ページのURL（省略可）</p>
             </div>
 
             {/* Title */}
@@ -165,15 +167,11 @@ export default function NewVideoPage({ params }: NewVideoProps) {
               />
             </div>
 
-            {/* Aspect Ratio & Voice */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Aspect Ratio, Voice Type, Voice Style */}
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="text-sm font-medium block mb-1.5">アスペクト比</label>
-                <select
-                  value={aspectRatio}
-                  onChange={e => setAspectRatio(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm border border-border rounded-lg bg-background"
-                >
+                <select value={aspectRatio} onChange={e => setAspectRatio(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-border rounded-lg bg-background">
                   <option value="9:16">9:16（縦・TikTok/Shorts）</option>
                   <option value="16:9">16:9（横・YouTube）</option>
                   <option value="1:1">1:1（正方形・Instagram）</option>
@@ -181,13 +179,18 @@ export default function NewVideoPage({ params }: NewVideoProps) {
               </div>
               <div>
                 <label className="text-sm font-medium block mb-1.5">ナレーション音声</label>
-                <select
-                  value={voiceType}
-                  onChange={e => setVoiceType(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm border border-border rounded-lg bg-background"
-                >
+                <select value={voiceType} onChange={e => setVoiceType(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-border rounded-lg bg-background">
                   <option value="female">女性</option>
                   <option value="male">男性</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1.5">話し方スタイル</label>
+                <select value={voiceStyle} onChange={e => setVoiceStyle(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-border rounded-lg bg-background">
+                  <option value="elegant">ゆっくり上品に</option>
+                  <option value="energetic">広告っぽく元気に</option>
+                  <option value="speedy">スピーディーに元気に</option>
+                  <option value="brand">大人っぽく洗練された感じ</option>
                 </select>
               </div>
             </div>
@@ -240,10 +243,23 @@ export default function NewVideoPage({ params }: NewVideoProps) {
               )}
             </div>
 
+            {/* Custom Instructions */}
+            <div>
+              <label className="text-sm font-medium block mb-1.5">追加指示（任意）</label>
+              <textarea
+                value={customInstructions}
+                onChange={e => setCustomInstructions(e.target.value)}
+                placeholder="台本や動画に反映したい指示を自由に記述してください。例：「明るいトーンで」「商品のコスパを強調」「20代女性向けの雰囲気で」など"
+                className="w-full px-4 py-2.5 text-sm border border-border rounded-lg bg-background resize-none"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground mt-1">台本作成やナレーションなどに反映されます</p>
+            </div>
+
             {/* Submit */}
             <Button
               onClick={handleCreate}
-              disabled={creating || !sourceUrl}
+              disabled={creating || (!sourceUrl && !title)}
               className="w-full h-12 bg-zinc-900 text-white hover:bg-zinc-800 text-sm font-semibold"
             >
               {creating ? (
