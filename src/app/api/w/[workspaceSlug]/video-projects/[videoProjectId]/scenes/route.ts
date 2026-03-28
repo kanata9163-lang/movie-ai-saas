@@ -9,7 +9,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { workspaceS
 
   const supabase = createServerClient();
   const body = await req.json();
-  const { sceneId, narration_text, description, image_prompt, duration } = body;
+  const { sceneId, narration_text, description, image_prompt, duration, subtitle_text, subtitle_style } = body;
 
   if (!sceneId) return errorResponse('validation', 'sceneId is required');
 
@@ -18,6 +18,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { workspaceS
   if (description !== undefined) update.description = description;
   if (image_prompt !== undefined) update.image_prompt = image_prompt;
   if (duration !== undefined) update.duration = duration;
+  if (subtitle_text !== undefined) update.subtitle_text = subtitle_text;
+  if (subtitle_style !== undefined) update.subtitle_style = subtitle_style;
 
   if (Object.keys(update).length === 0) {
     return errorResponse('validation', 'No fields to update');

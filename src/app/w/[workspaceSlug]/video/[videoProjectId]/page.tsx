@@ -26,11 +26,22 @@ import {
   Save,
   RotateCcw,
   Music,
+  BookOpen,
+  Quote,
+  TrendingUp,
 } from "lucide-react";
 import ShareButton from "@/components/ShareButton";
 
 interface VideoDetailProps {
   params: { workspaceSlug: string; videoProjectId: string };
+}
+
+interface SubtitleStyle {
+  fontSize: number;
+  fontColor: string;
+  bgColor: string;
+  position: 'top' | 'center' | 'bottom';
+  fontWeight: string;
 }
 
 interface Scene {
@@ -44,6 +55,8 @@ interface Scene {
   video_url: string | null;
   audio_url: string | null;
   status: string;
+  subtitle_text: string | null;
+  subtitle_style: SubtitleStyle | null;
 }
 
 interface VideoProject {
@@ -59,6 +72,17 @@ interface VideoProject {
   pipeline_logs: string[];
   error_message: string | null;
   scenes: Scene[];
+  company_analysis: {
+    companyName?: string;
+    industry?: string;
+    products?: string[];
+    targetAudience?: string;
+    tone?: string;
+    keyMessages?: string[];
+    description?: string;
+    citations?: Array<{ fact: string; source: string; context?: string }>;
+    marketInsights?: Array<{ insight: string; basis: string }>;
+  } | null;
 }
 
 // Map pipeline stages to wizard steps for the step indicator
@@ -89,8 +113,23 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
   const [composeProgress, setComposeProgress] = useState("");
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
-  const [editFields, setEditFields] = useState<{ narration_text: string; description: string; image_prompt: string; duration: number }>({ narration_text: '', description: '', image_prompt: '', duration: 5 });
+  const [editFields, setEditFields] = useState<{
+    narration_text: string;
+    description: string;
+    image_prompt: string;
+    duration: number;
+    subtitle_text: string;
+    subtitle_style: { fontSize: number; fontColor: string; bgColor: string; position: string; fontWeight: string };
+  }>({
+    narration_text: '',
+    description: '',
+    image_prompt: '',
+    duration: 5,
+    subtitle_text: '',
+    subtitle_style: { fontSize: 36, fontColor: '#FFFFFF', bgColor: 'rgba(0,0,0,0.7)', position: 'bottom', fontWeight: 'bold' },
+  });
   const [savingScene, setSavingScene] = useState(false);
   const [regeneratingScript, setRegeneratingScript] = useState(false);
   const [regeneratingVideoSceneId, setRegeneratingVideoSceneId] = useState<string | null>(null);
@@ -187,6 +226,8 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
       description: scene.description || '',
       image_prompt: scene.image_prompt || '',
       duration: scene.duration || 5,
+      subtitle_text: scene.subtitle_text || scene.narration_text || '',
+      subtitle_style: scene.subtitle_style || { fontSize: 36, fontColor: '#FFFFFF', bgColor: 'rgba(0,0,0,0.7)', position: 'bottom', fontWeight: 'bold' },
     });
   };
 
@@ -260,6 +301,66 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
   const proxyUrl = (sceneId: string, type: 'video' | 'audio' = 'video') =>
     `/api/w/${workspaceSlug}/video-projects/${videoProjectId}/download-video?sceneId=${sceneId}&type=${type}`;
 
+  const createSubtitleImage = async (
+    text: string,
+    width: number,
+    height: number,
+    style: { fontSize: number; fontColor: string; bgColor: string; position: string; fontWeight: string }
+  ): Promise<Uint8Array> => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, width, height);
+    const fontSize = style.fontSize || 36;
+    ctx.font = `${style.fontWeight || 'bold'} ${fontSize}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+    ctx.textAlign = 'center';
+    const maxWidth = width - 40;
+    const lines: string[] = [];
+    let currentLine = '';
+    for (const char of text) {
+      const testLine = currentLine + char;
+      if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = char;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    const lineHeight = fontSize * 1.4;
+    const totalHeight = lines.length * lineHeight;
+    let startY: number;
+    if (style.position === 'top') {
+      startY = 40 + fontSize;
+    } else if (style.position === 'center') {
+      startY = (height - totalHeight) / 2 + fontSize;
+    } else {
+      startY = height - totalHeight - 30;
+    }
+    if (style.bgColor && style.bgColor !== 'none') {
+      const padding = 12;
+      const bgWidth = Math.min(maxWidth + padding * 2, width);
+      const bgX = (width - bgWidth) / 2;
+      const bgY = startY - fontSize - padding / 2;
+      const bgH = totalHeight + padding;
+      ctx.fillStyle = style.bgColor;
+      ctx.beginPath();
+      ctx.roundRect(bgX, bgY, bgWidth, bgH, 8);
+      ctx.fill();
+    }
+    for (let i = 0; i < lines.length; i++) {
+      const y = startY + i * lineHeight;
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = 4;
+      ctx.strokeText(lines[i], width / 2, y);
+      ctx.fillStyle = style.fontColor || '#FFFFFF';
+      ctx.fillText(lines[i], width / 2, y);
+    }
+    const blob = await new Promise<Blob>((resolve) => canvas.toBlob(b => resolve(b!), 'image/png'));
+    return new Uint8Array(await blob.arrayBuffer());
+  };
+
   const handleCompose = async () => {
     if (!project) return;
     const scenesWithVideo = project.scenes.filter(s => s.video_url).sort((a, b) => a.scene_number - b.scene_number);
@@ -318,12 +419,56 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
               "-max_interleave_delta", "100M",
               mergedName
             ]);
-            fileNames.push(mergedName);
+            // Burn subtitles if available
+            if (scene.subtitle_text) {
+              const subtitleStyle = scene.subtitle_style || { fontSize: 36, fontColor: '#FFFFFF', bgColor: 'rgba(0,0,0,0.7)', position: 'bottom', fontWeight: 'bold' };
+              const aspectRatio = project.aspect_ratio || '9:16';
+              const [w, h] = aspectRatio === '16:9' ? [1280, 720] : aspectRatio === '1:1' ? [960, 960] : [720, 1280];
+              setComposeProgress(`シーン${scene.scene_number} 字幕を追加中...`);
+              const subtitlePng = await createSubtitleImage(scene.subtitle_text, w, h, subtitleStyle);
+              const overlayName = `overlay${i}.png`;
+              await ffmpeg.writeFile(overlayName, subtitlePng);
+              const subtitledName = `s${i}.mp4`;
+              await ffmpeg.exec([
+                "-i", mergedName,
+                "-i", overlayName,
+                "-filter_complex", "[0:v][1:v]overlay=0:0",
+                "-c:v", "libx264", "-preset", "ultrafast",
+                "-c:a", "copy",
+                subtitledName
+              ]);
+              await ffmpeg.deleteFile(mergedName).catch(() => {});
+              await ffmpeg.deleteFile(overlayName).catch(() => {});
+              fileNames.push(subtitledName);
+            } else {
+              fileNames.push(mergedName);
+            }
           } else {
             fileNames.push(videoName);
           }
         } else {
-          fileNames.push(videoName);
+          // No audio - still burn subtitles if available
+          if (scene.subtitle_text) {
+            const subtitleStyle = scene.subtitle_style || { fontSize: 36, fontColor: '#FFFFFF', bgColor: 'rgba(0,0,0,0.7)', position: 'bottom', fontWeight: 'bold' };
+            const aspectRatio = project.aspect_ratio || '9:16';
+            const [w, h] = aspectRatio === '16:9' ? [1280, 720] : aspectRatio === '1:1' ? [960, 960] : [720, 1280];
+            setComposeProgress(`シーン${scene.scene_number} 字幕を追加中...`);
+            const subtitlePng = await createSubtitleImage(scene.subtitle_text, w, h, subtitleStyle);
+            const overlayName = `overlay${i}.png`;
+            await ffmpeg.writeFile(overlayName, subtitlePng);
+            const subtitledName = `s${i}.mp4`;
+            await ffmpeg.exec([
+              "-i", videoName,
+              "-i", overlayName,
+              "-filter_complex", "[0:v][1:v]overlay=0:0",
+              "-c:v", "libx264", "-preset", "ultrafast",
+              subtitledName
+            ]);
+            await ffmpeg.deleteFile(overlayName).catch(() => {});
+            fileNames.push(subtitledName);
+          } else {
+            fileNames.push(videoName);
+          }
         }
       }
 
@@ -475,7 +620,14 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
 
           <h1 className="text-xl font-bold mb-1">{project.title || '無題'}</h1>
           <p className="text-sm text-muted-foreground mb-8">
-            {project.source_url && <>{project.source_url} / </>}{project.aspect_ratio} / {project.voice_type === 'female' ? '女性' : '男性'}ナレーション（{({elegant: 'ゆっくり上品', energetic: '元気に広告風', speedy: 'スピーディー', brand: '大人っぽく洗練'} as Record<string, string>)[project.voice_style] || project.voice_style}） / {project.scenes.length}シーン
+            {project.source_url && (
+              <>
+                <a href={project.source_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                  {project.source_url}
+                </a>
+                {' / '}
+              </>
+            )}{project.aspect_ratio} / {project.voice_type === 'female' ? '女性' : '男性'}ナレーション（{({elegant: 'ゆっくり上品', energetic: '元気に広告風', speedy: 'スピーディー', brand: '大人っぽく洗練'} as Record<string, string>)[project.voice_style] || project.voice_style}） / {project.scenes.length}シーン
           </p>
 
           {/* Step Indicator (storyboard style) */}
@@ -674,6 +826,64 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
             </div>
           )}
 
+          {/* Analysis & Citations */}
+          {project.company_analysis &&
+            ((project.company_analysis.citations?.length || 0) > 0 || (project.company_analysis.marketInsights?.length || 0) > 0) && (
+            <div className="mb-8">
+              <button
+                onClick={() => setShowAnalysis(!showAnalysis)}
+                className="flex items-center gap-2 text-sm font-bold mb-3 hover:text-blue-600 transition-colors"
+              >
+                <BookOpen className="w-4 h-4" />
+                分析結果・引用情報
+                {showAnalysis ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {showAnalysis && (
+                <div className="space-y-4">
+                  {/* Citations */}
+                  {project.company_analysis.citations && project.company_analysis.citations.length > 0 && (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                      <h3 className="text-xs font-semibold text-blue-700 mb-3 flex items-center gap-1.5">
+                        <Quote className="w-3.5 h-3.5" />
+                        サイトから抽出した情報
+                      </h3>
+                      <div className="space-y-2">
+                        {project.company_analysis.citations.map((citation, idx) => (
+                          <div key={idx} className="bg-white rounded-lg p-3 border border-blue-100">
+                            <p className="text-sm font-medium text-foreground">{citation.fact}</p>
+                            <p className="text-[11px] text-blue-600 mt-1">出典: {citation.source}</p>
+                            {citation.context && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5 italic">{`「${citation.context}」`}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Market Insights */}
+                  {project.company_analysis.marketInsights && project.company_analysis.marketInsights.length > 0 && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+                      <h3 className="text-xs font-semibold text-amber-700 mb-3 flex items-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5" />
+                        市場分析・インサイト
+                      </h3>
+                      <div className="space-y-2">
+                        {project.company_analysis.marketInsights.map((insight, idx) => (
+                          <div key={idx} className="bg-white rounded-lg p-3 border border-amber-100">
+                            <p className="text-sm font-medium text-foreground">{insight.insight}</p>
+                            <p className="text-[11px] text-amber-600 mt-1">根拠: {insight.basis}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Scene Cards - Horizontal Scroll (storyboard style) */}
           {project.scenes.length > 0 && (
             <div className="mb-8">
@@ -761,6 +971,56 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                                 rows={3}
                               />
                             </div>
+                            <div>
+                              <label className="text-[10px] font-medium text-muted-foreground block mb-1">字幕テロップ</label>
+                              <textarea
+                                value={editFields.subtitle_text}
+                                onChange={e => setEditFields(f => ({ ...f, subtitle_text: e.target.value }))}
+                                className="w-full text-xs p-2 border border-amber-300 rounded bg-amber-50 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                rows={2}
+                                placeholder="字幕テキスト（空欄で非表示）"
+                              />
+                              <div className="flex gap-2 mt-1.5">
+                                <select
+                                  value={editFields.subtitle_style.fontSize}
+                                  onChange={e => setEditFields(f => ({ ...f, subtitle_style: { ...f.subtitle_style, fontSize: Number(e.target.value) } }))}
+                                  className="text-[10px] border border-border rounded px-1.5 py-1 bg-background"
+                                >
+                                  <option value={24}>小</option>
+                                  <option value={30}>中</option>
+                                  <option value={36}>大</option>
+                                  <option value={42}>特大</option>
+                                </select>
+                                <select
+                                  value={editFields.subtitle_style.fontColor}
+                                  onChange={e => setEditFields(f => ({ ...f, subtitle_style: { ...f.subtitle_style, fontColor: e.target.value } }))}
+                                  className="text-[10px] border border-border rounded px-1.5 py-1 bg-background"
+                                >
+                                  <option value="#FFFFFF">白文字</option>
+                                  <option value="#FFFF00">黄色文字</option>
+                                  <option value="#00FFFF">水色文字</option>
+                                  <option value="#FF6B6B">赤文字</option>
+                                </select>
+                                <select
+                                  value={editFields.subtitle_style.position}
+                                  onChange={e => setEditFields(f => ({ ...f, subtitle_style: { ...f.subtitle_style, position: e.target.value } }))}
+                                  className="text-[10px] border border-border rounded px-1.5 py-1 bg-background"
+                                >
+                                  <option value="bottom">下部</option>
+                                  <option value="center">中央</option>
+                                  <option value="top">上部</option>
+                                </select>
+                                <select
+                                  value={editFields.subtitle_style.bgColor}
+                                  onChange={e => setEditFields(f => ({ ...f, subtitle_style: { ...f.subtitle_style, bgColor: e.target.value } }))}
+                                  className="text-[10px] border border-border rounded px-1.5 py-1 bg-background"
+                                >
+                                  <option value="rgba(0,0,0,0.7)">黒背景</option>
+                                  <option value="rgba(0,0,0,0.4)">薄い黒背景</option>
+                                  <option value="none">背景なし</option>
+                                </select>
+                              </div>
+                            </div>
                             <div className="flex gap-2">
                               <Button size="sm" className="flex-1 text-xs h-7" onClick={saveScene} disabled={savingScene}>
                                 {savingScene ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
@@ -789,6 +1049,23 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                                   {scene.description}
                                 </p>
+                              </div>
+                            )}
+
+                            {scene.subtitle_text && (
+                              <div>
+                                <label className="text-[10px] font-medium text-muted-foreground block mb-1">字幕テロップ</label>
+                                <div
+                                  className="text-xs rounded p-2 text-center"
+                                  style={{
+                                    color: scene.subtitle_style?.fontColor || '#FFFFFF',
+                                    backgroundColor: scene.subtitle_style?.bgColor || 'rgba(0,0,0,0.7)',
+                                    fontSize: `${(scene.subtitle_style?.fontSize || 36) / 3}px`,
+                                    fontWeight: scene.subtitle_style?.fontWeight || 'bold',
+                                  }}
+                                >
+                                  {scene.subtitle_text}
+                                </div>
                               </div>
                             )}
 

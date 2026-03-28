@@ -22,6 +22,15 @@ export const CompanyAnalysisSchema = z.object({
   tone: z.string(),
   keyMessages: z.array(z.string()),
   description: z.string(),
+  citations: z.array(z.object({
+    fact: z.string(),
+    source: z.string(),
+    context: z.string().optional(),
+  })).optional().default([]),
+  marketInsights: z.array(z.object({
+    insight: z.string(),
+    basis: z.string(),
+  })).optional().default([]),
 });
 
 export type CompanyAnalysis = z.infer<typeof CompanyAnalysisSchema>;

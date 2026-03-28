@@ -71,6 +71,8 @@ export async function runAnalyzeAndScript(projectId: string) {
         tone: '',
         keyMessages: [],
         description: project.custom_instructions || project.title || '',
+        citations: [],
+        marketInsights: [],
       };
     }
 
@@ -182,6 +184,7 @@ export async function runAnalyzeAndScript(projectId: string) {
         description: scene.visualDescription ?? '',
         duration: scene.durationSeconds ?? 5,
         status: 'pending',
+        subtitle_text: scene.narrationText ?? '',
       });
     }
 
