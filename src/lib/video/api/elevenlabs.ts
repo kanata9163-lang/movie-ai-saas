@@ -41,8 +41,8 @@ export async function generateNarration(
           similarity_boost: styleSettings.similarity_boost,
           style: styleSettings.style,
           use_speaker_boost: true,
-          ...(styleSettings.speed ? { speed: styleSettings.speed } : {}),
         },
+        ...(styleSettings.speed ? { speed: styleSettings.speed } : {}),
       }),
     }
   );
