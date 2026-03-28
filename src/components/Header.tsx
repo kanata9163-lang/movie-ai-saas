@@ -26,6 +26,7 @@ export default function Header({ title, userEmail }: HeaderProps) {
   const pathname = usePathname();
   const [showMenu, setShowMenu] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Extract workspace slug from pathname
   const workspaceSlug = pathname?.match(/\/w\/([^/]+)/)?.[1] || '';
@@ -35,7 +36,10 @@ export default function Header({ title, userEmail }: HeaderProps) {
     fetch(`/api/w/${workspaceSlug}/credits`)
       .then(res => res.json())
       .then(json => {
-        if (json.ok) setCredits(json.data.balance);
+        if (json.ok) {
+          setCredits(json.data.balance);
+          setIsAdmin(json.data.isAdmin || false);
+        }
       })
       .catch(() => {});
   }, [workspaceSlug]);
@@ -53,8 +57,8 @@ export default function Header({ title, userEmail }: HeaderProps) {
         )}
       </div>
       <div className="flex items-center gap-3">
-        {/* Credit balance */}
-        {credits !== null && workspaceSlug && (
+        {/* Credit balance - hidden for admins */}
+        {credits !== null && workspaceSlug && !isAdmin && (
           <button
             onClick={() => router.push(`/w/${workspaceSlug}/settings?tab=billing`)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 transition-colors border border-amber-200"
@@ -64,6 +68,13 @@ export default function Header({ title, userEmail }: HeaderProps) {
               {credits.toLocaleString()}
             </span>
           </button>
+        )}
+        {/* Admin badge */}
+        {isAdmin && workspaceSlug && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
+            <Coins className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="text-sm font-semibold text-emerald-700">∞</span>
+          </div>
         )}
         {/* Email button */}
         <div className="relative">

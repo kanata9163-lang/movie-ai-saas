@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: { workspaceSl
   const { sceneId } = await req.json();
   if (!sceneId) return NextResponse.json({ error: 'sceneId required' }, { status: 400 });
 
-  const creditError = await checkAndDeductCredits(auth.workspace.id as string, 'IMAGE_REGENERATION', '画像再生成');
+  const creditError = await checkAndDeductCredits(auth.workspace.id as string, 'IMAGE_REGENERATION', '画像再生成', auth.userEmail);
   if (creditError) return creditError;
 
   const result = await regenerateSceneImage(params.videoProjectId, sceneId);

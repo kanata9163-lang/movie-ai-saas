@@ -12,7 +12,7 @@ export async function POST(
   const auth = await getWorkspaceWithAuth(params.workspaceSlug, request);
   if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
-  const creditError = await checkAndDeductCredits(auth.workspace.id as string, 'IMAGE_GENERATION', '絵コンテ画像生成');
+  const creditError = await checkAndDeductCredits(auth.workspace.id as string, 'IMAGE_GENERATION', '絵コンテ画像生成', auth.userEmail);
   if (creditError) return creditError;
 
   const db = getSupabase();

@@ -58,7 +58,7 @@ export async function getAuthUser(request: NextRequest) {
 export async function getWorkspaceWithAuth(
   slug: string,
   request: NextRequest
-): Promise<{ workspace: Record<string, unknown>; role: string; userId: string } | null> {
+): Promise<{ workspace: Record<string, unknown>; role: string; userId: string; userEmail: string } | null> {
   const user = await getAuthUser(request);
   if (!user) return null;
 
@@ -81,5 +81,5 @@ export async function getWorkspaceWithAuth(
 
   if (memError || !membership) return null;
 
-  return { workspace, role: membership.role, userId: user.id };
+  return { workspace, role: membership.role, userId: user.id, userEmail: user.email || '' };
 }

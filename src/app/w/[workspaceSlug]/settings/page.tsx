@@ -66,6 +66,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
   const [buyAmount, setBuyAmount] = useState("1000");
   const [buying, setBuying] = useState(false);
   const [workspaceId, setWorkspaceId] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadData = async () => {
     try {
@@ -93,6 +94,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
         if (creditsJson.ok) {
           setCreditBalance(creditsJson.data.balance);
           setCreditTransactions(creditsJson.data.transactions || []);
+          setIsAdmin(creditsJson.data.isAdmin || false);
         }
       } catch {}
       if (membersJson.ok) setMembers(membersJson.data || []);
@@ -643,81 +645,92 @@ export default function SettingsPage({ params }: SettingsPageProps) {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-sm text-muted-foreground">クレジット残高</p>
-                <p className="text-3xl font-bold text-foreground">{creditBalance.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground mt-1">1クレジット = ¥1</p>
+                {isAdmin ? (
+                  <>
+                    <p className="text-3xl font-bold text-emerald-600">∞ 無制限</p>
+                    <p className="text-xs text-emerald-500 mt-1">管理者アカウント - クレジット消費なし</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-3xl font-bold text-foreground">{creditBalance.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground mt-1">1クレジット = ¥1</p>
+                  </>
+                )}
               </div>
-              <div className="w-14 h-14 rounded-xl bg-amber-50 flex items-center justify-center">
-                <Coins className="w-7 h-7 text-amber-600" />
+              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${isAdmin ? 'bg-emerald-50' : 'bg-amber-50'}`}>
+                <Coins className={`w-7 h-7 ${isAdmin ? 'text-emerald-600' : 'text-amber-600'}`} />
               </div>
             </div>
 
-            {/* Buy credits */}
-            <div className="border-t border-border pt-4">
-              <p className="text-sm font-medium mb-2">クレジット購入</p>
-              <div className="flex gap-2 mb-3">
-                {["500", "1000", "3000", "5000", "10000"].map((amount) => (
-                  <button
-                    key={amount}
-                    onClick={() => setBuyAmount(amount)}
-                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                      buyAmount === amount
-                        ? "border-amber-500 bg-amber-50 text-amber-700 font-medium"
-                        : "border-border hover:bg-muted"
-                    }`}
-                  >
-                    {parseInt(amount).toLocaleString()}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  value={buyAmount}
-                  onChange={(e) => setBuyAmount(e.target.value)}
-                  min={100}
-                  max={100000}
-                  className="max-w-[140px]"
-                />
-                <span className="text-sm text-muted-foreground">
-                  = ¥{parseInt(buyAmount || "0").toLocaleString()}
-                </span>
-                <Button
-                  onClick={async () => {
-                    setBuying(true);
-                    try {
-                      const res = await fetch("/api/stripe/checkout", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          credits: parseInt(buyAmount),
-                          workspaceId,
-                          workspaceSlug,
-                        }),
-                      });
-                      const json = await res.json();
-                      if (json.ok && json.data?.url) {
-                        window.location.href = json.data.url;
-                      } else {
-                        alert(json.error || "決済の開始に失敗しました");
+            {/* Buy credits - hidden for admins */}
+            {!isAdmin && (
+              <div className="border-t border-border pt-4">
+                <p className="text-sm font-medium mb-2">クレジット購入</p>
+                <div className="flex gap-2 mb-3">
+                  {["500", "1000", "3000", "5000", "10000"].map((amount) => (
+                    <button
+                      key={amount}
+                      onClick={() => setBuyAmount(amount)}
+                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                        buyAmount === amount
+                          ? "border-amber-500 bg-amber-50 text-amber-700 font-medium"
+                          : "border-border hover:bg-muted"
+                      }`}
+                    >
+                      {parseInt(amount).toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    value={buyAmount}
+                    onChange={(e) => setBuyAmount(e.target.value)}
+                    min={100}
+                    max={100000}
+                    className="max-w-[140px]"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    = ¥{parseInt(buyAmount || "0").toLocaleString()}
+                  </span>
+                  <Button
+                    onClick={async () => {
+                      setBuying(true);
+                      try {
+                        const res = await fetch("/api/stripe/checkout", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            credits: parseInt(buyAmount),
+                            workspaceId,
+                            workspaceSlug,
+                          }),
+                        });
+                        const json = await res.json();
+                        if (json.ok && json.data?.url) {
+                          window.location.href = json.data.url;
+                        } else {
+                          alert(json.error || "決済の開始に失敗しました");
+                        }
+                      } catch {
+                        alert("決済の開始に失敗しました");
+                      } finally {
+                        setBuying(false);
                       }
-                    } catch {
-                      alert("決済の開始に失敗しました");
-                    } finally {
-                      setBuying(false);
-                    }
-                  }}
-                  disabled={buying || !buyAmount || parseInt(buyAmount) < 100}
-                  className="gap-1.5"
-                >
-                  {buying ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CreditCard className="w-4 h-4" />
-                  )}
-                  購入する
-                </Button>
+                    }}
+                    disabled={buying || !buyAmount || parseInt(buyAmount) < 100}
+                    className="gap-1.5"
+                  >
+                    {buying ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-4 h-4" />
+                    )}
+                    購入する
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Cost Table */}

@@ -10,7 +10,7 @@ export async function POST(req: NextRequest, { params }: { params: { workspaceSl
   const auth = await getWorkspaceWithAuth(params.workspaceSlug, req);
   if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
 
-  const creditError = await checkAndDeductCredits(auth.workspace.id as string, 'BGM_GENERATION', 'BGM生成');
+  const creditError = await checkAndDeductCredits(auth.workspace.id as string, 'BGM_GENERATION', 'BGM生成', auth.userEmail);
   if (creditError) return creditError;
 
   const supabase = createServerClient();
