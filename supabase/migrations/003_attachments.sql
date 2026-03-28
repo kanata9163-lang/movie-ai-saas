@@ -1,3 +1,7 @@
+-- Add new columns to video_projects
+ALTER TABLE video_projects ADD COLUMN IF NOT EXISTS voice_style text DEFAULT 'energetic';
+ALTER TABLE video_projects ADD COLUMN IF NOT EXISTS custom_instructions text DEFAULT '';
+
 -- File attachments for video projects
 CREATE TABLE IF NOT EXISTS video_attachments (
   id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
