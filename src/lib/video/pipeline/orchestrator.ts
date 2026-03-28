@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { analyzeCompanyUrl, generateScript, ReferenceImage } from '../ai/gemini';
 import { generateVideoImage, ReferenceImageData } from '../api/image-gen';
-import { createVideoFromImage, checkTaskStatus } from '../api/runway';
+import { createVideoFromImage, checkTaskStatus } from '../api/byteplus';
 import { generateNarration } from '../api/elevenlabs';
 
 async function updateProjectStatus(projectId: string, status: string, errorMessage?: string) {
@@ -245,7 +245,7 @@ export async function submitVideoTasks(projectId: string) {
 
   try {
     await updateProjectStatus(projectId, 'generating_video');
-    await addLog(projectId, '動画生成開始（Runway AI）...');
+    await addLog(projectId, '動画生成開始（Seedance 1.5 Pro）...');
 
     const { data: projectData } = await supabase.from('video_projects').select('aspect_ratio').eq('id', projectId).single();
     const aspectRatio = projectData?.aspect_ratio || '9:16';
@@ -348,8 +348,8 @@ export async function runNarrationGeneration(projectId: string) {
         // Estimate audio duration from MP3 buffer size
         // MP3 at ~128kbps: duration ≈ (bytes * 8) / 128000
         const estimatedDuration = Math.ceil((audioBuffer.length * 8) / 128000);
-        // Runway only supports 5 or 10 seconds
-        const videoDuration = estimatedDuration <= 5 ? 5 : 10;
+        // Seedance 1.5 supports 2-12 seconds
+        const videoDuration = Math.max(2, Math.min(estimatedDuration, 12));
 
         const path = `video/${projectId}/audio/${sceneNumber}.mp3`;
         await supabase.storage.from('generated-assets').upload(path, audioBuffer, { contentType: 'audio/mpeg', upsert: true });
