@@ -124,6 +124,29 @@ export async function runAnalyzeAndScript(projectId: string) {
         `制作者からの追加指示（必ず反映してください）:\n${project.custom_instructions}`;
     }
 
+    // Fetch file attachments
+    let attachmentContext = '';
+    try {
+      const { data: attachments } = await supabase
+        .from('video_attachments')
+        .select('file_name, file_type_label, extracted_text')
+        .eq('video_project_id', projectId);
+
+      if (attachments && attachments.length > 0) {
+        const attachmentParts = attachments.map((att: { file_name: string; file_type_label: string; extracted_text: string | null }) => {
+          return `【添付資料: ${att.file_name}（${att.file_type_label}）】\n${att.extracted_text?.slice(0, 3000) || '（内容なし）'}`;
+        });
+        attachmentContext = `添付資料（以下の資料の内容を台本に反映してください）:\n${attachmentParts.join('\n\n')}`;
+        await addLog(projectId, `添付資料 ${attachments.length}件をプロンプトに注入`);
+      }
+    } catch {
+      // Attachment fetch failure is non-critical
+    }
+
+    if (attachmentContext) {
+      knowledgeContext = (knowledgeContext ? knowledgeContext + '\n\n' : '') + attachmentContext;
+    }
+
     // Generate Script
     await updateProjectStatus(projectId, 'scripting');
     await addLog(projectId, '台本作成中...');

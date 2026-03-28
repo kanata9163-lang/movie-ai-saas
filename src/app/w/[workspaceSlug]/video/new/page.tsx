@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/useUser";
-import { Loader2, Upload, X, Link as LinkIcon, Users } from "lucide-react";
+import { Loader2, Upload, X, Link as LinkIcon, Users, FileText } from "lucide-react";
 
 interface NewVideoProps {
   params: { workspaceSlug: string };
@@ -37,8 +37,10 @@ export default function NewVideoPage({ params }: NewVideoProps) {
   const [voiceStyle, setVoiceStyle] = useState("energetic");
   const [customInstructions, setCustomInstructions] = useState("");
   const [refImages, setRefImages] = useState<RefImage[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; data: string; mimeType: string }>>([]);
   const [creating, setCreating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   // Client selection
   const [clients, setClients] = useState<ClientOption[]>([]);
@@ -78,6 +80,38 @@ export default function NewVideoPage({ params }: NewVideoProps) {
     e.target.value = '';
   };
 
+  const handleAddDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const supportedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+    ];
+
+    if (!supportedTypes.includes(file.type)) {
+      alert('対応していないファイル形式です。PDF, Word, CSV, Excelに対応しています。');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAttachedFiles(prev => [...prev, {
+        name: file.name,
+        data: reader.result as string,
+        mimeType: file.type,
+      }]);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   const handleCreate = async () => {
     if (!sourceUrl && !title) return alert("URLまたはタイトルを入力してください");
     setCreating(true);
@@ -97,6 +131,15 @@ export default function NewVideoPage({ params }: NewVideoProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image_data: img.preview, image_type: img.imageType, name: img.name }),
+        });
+      }
+
+      // 2.5. Upload document attachments
+      for (const doc of attachedFiles) {
+        await fetch(`/api/w/${workspaceSlug}/video-projects/${project.id}/attachments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_data: doc.data, file_name: doc.name, mime_type: doc.mimeType }),
         });
       }
 
@@ -254,6 +297,52 @@ export default function NewVideoPage({ params }: NewVideoProps) {
                 rows={3}
               />
               <p className="text-xs text-muted-foreground mt-1">台本作成やナレーションなどに反映されます</p>
+            </div>
+
+            {/* Document Attachments */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium">資料添付（任意）</label>
+                <Button variant="outline" size="sm" onClick={() => docInputRef.current?.click()} className="text-xs h-7">
+                  <Upload className="w-3 h-3" />資料を追加
+                </Button>
+              </div>
+              <input
+                ref={docInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.csv,.xls,.xlsx,.txt"
+                onChange={handleAddDocument}
+                className="hidden"
+              />
+              <p className="text-xs text-muted-foreground mb-2">PDF, Word, CSV, Excelファイルを添付すると内容が台本に反映されます</p>
+
+              {attachedFiles.length > 0 ? (
+                <div className="space-y-2">
+                  {attachedFiles.map((file, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg border border-border bg-zinc-50">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm">{file.name}</span>
+                      </div>
+                      <button
+                        onClick={() => setAttachedFiles(prev => prev.filter((_, j) => j !== i))}
+                        className="text-zinc-400 hover:text-red-500 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  onClick={() => docInputRef.current?.click()}
+                  className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-zinc-400 transition-colors"
+                >
+                  <FileText className="w-6 h-6 text-zinc-300 mx-auto mb-1" />
+                  <p className="text-xs text-muted-foreground">クリックして資料を追加</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">PDF, Word, CSV, Excel対応</p>
+                </div>
+              )}
             </div>
 
             {/* Submit */}
