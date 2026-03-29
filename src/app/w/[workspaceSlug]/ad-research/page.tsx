@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/useUser";
@@ -121,6 +121,7 @@ const priorityColor = (p: string) => {
 export default function AdResearchPage({ params }: AdResearchPageProps) {
   const { workspaceSlug } = params;
   const { user } = useUser();
+  const router = useRouter();
   const [analyses, setAnalyses] = useState<AdAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -506,12 +507,55 @@ export default function AdResearchPage({ params }: AdResearchPageProps) {
 
                       {/* CTA */}
                       <div className="pt-2">
-                        <Link href={`/w/${workspaceSlug}/video/new`}>
-                          <Button className="bg-zinc-900 text-white hover:bg-zinc-800" size="sm">
-                            <Clapperboard className="w-3.5 h-3.5" />
-                            この広告パターンで動画を作成
-                          </Button>
-                        </Link>
+                        <Button
+                          className="bg-zinc-900 text-white hover:bg-zinc-800"
+                          size="sm"
+                          onClick={() => {
+                            const r = analysis.results;
+                            const patterns = r.adPatterns || [];
+                            const insights = r.overallInsights;
+                            let instructions = `【広告リサーチの分析結果を基に動画を作成】\n`;
+                            instructions += `検索: ${analysis.query} / 媒体: ${analysis.platform}\n\n`;
+
+                            if (patterns.length > 0) {
+                              const p = patterns[0];
+                              instructions += `■ 推奨パターン: ${p.patternName}\n`;
+                              instructions += `${p.description}\n`;
+                              if (p.keyElements) {
+                                instructions += `・フック: ${p.keyElements.hook}\n`;
+                                instructions += `・本文: ${p.keyElements.body}\n`;
+                                instructions += `・CTA: ${p.keyElements.cta}\n`;
+                              }
+                              if (p.targetAudience) instructions += `・ターゲット: ${p.targetAudience}\n`;
+                              instructions += '\n';
+                            }
+
+                            if (insights) {
+                              if (insights.optimalDuration) instructions += `■ 推奨尺: ${insights.optimalDuration}\n`;
+                              if (insights.doList && insights.doList.length > 0) {
+                                instructions += `■ DO:\n${insights.doList.map(d => `・${d}`).join('\n')}\n`;
+                              }
+                              if (insights.dontList && insights.dontList.length > 0) {
+                                instructions += `■ DON'T:\n${insights.dontList.map(d => `・${d}`).join('\n')}\n`;
+                              }
+                            }
+
+                            if (r.recommendations && r.recommendations.length > 0) {
+                              instructions += `\n■ 推奨アクション:\n`;
+                              r.recommendations.forEach(rec => {
+                                instructions += `・${rec.title}: ${rec.description}\n`;
+                              });
+                            }
+
+                            const params = new URLSearchParams();
+                            params.set('instructions', instructions.trim());
+                            params.set('title', `${analysis.query} - ${analysis.platform}広告`);
+                            router.push(`/w/${workspaceSlug}/video/new?${params.toString()}`);
+                          }}
+                        >
+                          <Clapperboard className="w-3.5 h-3.5" />
+                          この広告パターンで動画を作成
+                        </Button>
                       </div>
                     </div>
                   )}

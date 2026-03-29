@@ -35,7 +35,7 @@ export default function NewVideoPage({ params }: NewVideoProps) {
   const [aspectRatio, setAspectRatio] = useState("9:16");
   const [voiceType, setVoiceType] = useState("female");
   const [voiceStyle, setVoiceStyle] = useState("energetic");
-  const [customInstructions, setCustomInstructions] = useState("");
+  const [customInstructions, setCustomInstructions] = useState(searchParams.get("instructions") || "");
   const [refImages, setRefImages] = useState<RefImage[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; data: string; mimeType: string }>>([]);
   const [creating, setCreating] = useState(false);
