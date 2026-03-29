@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { CardSkeleton, ListSkeleton } from "@/components/Skeleton";
 import { api, type DashboardData } from "@/lib/api-client";
+import { cachedFetch } from "@/lib/fetch-cache";
 import { useEffect, useState } from "react";
 import { useUser } from "@/lib/useUser";
 
@@ -95,8 +96,8 @@ export default function DashboardPage({ params }: DashboardPageProps) {
 
   const loadData = async () => {
     try {
-      const dashboard = await api.getDashboard(workspaceSlug);
-      setData(dashboard);
+      const res = await cachedFetch<{ ok: boolean; data: DashboardData }>(`/api/w/${workspaceSlug}/dashboard`, 15000);
+      setData(res.data);
     } catch {
       setData({
         active_projects: [],

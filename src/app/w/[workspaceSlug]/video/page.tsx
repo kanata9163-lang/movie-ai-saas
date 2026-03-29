@@ -9,6 +9,7 @@ import { Plus, Video, Search } from "lucide-react";
 import LinkToProject from "@/components/LinkToProject";
 import { CardSkeleton } from "@/components/Skeleton";
 import { STAGE_LABELS, PipelineStage } from "@/lib/video/pipeline/types";
+import { cachedFetch } from "@/lib/fetch-cache";
 
 interface VideoListProps {
   params: { workspaceSlug: string };
@@ -40,8 +41,7 @@ export default function VideoListPage({ params }: VideoListProps) {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    fetch(`/api/w/${workspaceSlug}/video-projects`)
-      .then(r => r.json())
+    cachedFetch<{ ok: boolean; data: VideoProject[] }>(`/api/w/${workspaceSlug}/video-projects`, 10000)
       .then(res => { setProjects(res.data || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, [workspaceSlug]);

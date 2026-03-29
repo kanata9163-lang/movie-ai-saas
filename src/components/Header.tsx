@@ -3,6 +3,7 @@
 import { Bell, LogOut, Coins } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import { cachedFetch } from "@/lib/fetch-cache";
 
 function formatDate(date: Date): string {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -33,10 +34,9 @@ export default function Header({ title, userEmail }: HeaderProps) {
 
   useEffect(() => {
     if (!workspaceSlug) return;
-    fetch(`/api/w/${workspaceSlug}/credits`)
-      .then(res => res.json())
+    cachedFetch<{ ok: boolean; data?: { balance: number; isAdmin?: boolean } }>(`/api/w/${workspaceSlug}/credits`, 60000)
       .then(json => {
-        if (json.ok) {
+        if (json.ok && json.data) {
           setCredits(json.data.balance);
           setIsAdmin(json.data.isAdmin || false);
         }
