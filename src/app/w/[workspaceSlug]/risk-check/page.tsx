@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/useUser";
-import { Loader2, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, FileWarning, Type, Eye, Scale } from "lucide-react";
+import { Loader2, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, FileWarning, Type, Eye, Scale, Upload, Film, X } from "lucide-react";
 
 interface RiskCheckProps {
   params: { workspaceSlug: string };
@@ -46,13 +46,19 @@ export default function RiskCheckPage({ params }: RiskCheckProps) {
   const { workspaceSlug } = params;
   const { user } = useUser();
 
-  const [inputMode, setInputMode] = useState<'text' | 'project'>('text');
+  const [inputMode, setInputMode] = useState<'video' | 'text' | 'project'>('video');
   const [scriptText, setScriptText] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [projects, setProjects] = useState<VideoProject[]>([]);
   const [targetPlatforms, setTargetPlatforms] = useState<string[]>(["meta", "tiktok", "youtube"]);
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<RiskResult | null>(null);
+
+  // Video upload states
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [extractedText, setExtractedText] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`/api/w/${workspaceSlug}/video-projects`)
@@ -63,9 +69,48 @@ export default function RiskCheckPage({ params }: RiskCheckProps) {
       .catch(() => {});
   }, [workspaceSlug]);
 
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setVideoFile(file);
+      setExtractedText("");
+    }
+  };
+
+  const handleExtractText = async () => {
+    if (!videoFile) return;
+    setExtracting(true);
+    try {
+      const formData = new FormData();
+      formData.append('video', videoFile);
+      const res = await fetch(`/api/w/${workspaceSlug}/extract-video-text`, {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setExtractedText(json.data.extractedText);
+      } else {
+        alert(json.error || 'テキスト抽出に失敗しました');
+      }
+    } catch {
+      alert('テキスト抽出に失敗しました');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   const handleCheck = async () => {
-    if (inputMode === 'text' && !scriptText.trim()) return alert('チェック対象のテキストを入力してください');
-    if (inputMode === 'project' && !selectedProjectId) return alert('プロジェクトを選択してください');
+    let contentToCheck = '';
+    if (inputMode === 'video') {
+      contentToCheck = extractedText.trim();
+      if (!contentToCheck) return alert('まず動画からテキストを抽出してください');
+    } else if (inputMode === 'text') {
+      contentToCheck = scriptText.trim();
+      if (!contentToCheck) return alert('チェック対象のテキストを入力してください');
+    } else if (inputMode === 'project') {
+      if (!selectedProjectId) return alert('プロジェクトを選択してください');
+    }
 
     setChecking(true);
     try {
@@ -73,8 +118,8 @@ export default function RiskCheckPage({ params }: RiskCheckProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mode: inputMode,
-          scriptText: scriptText.trim(),
+          mode: inputMode === 'video' ? 'text' : inputMode,
+          scriptText: inputMode === 'video' ? extractedText.trim() : scriptText.trim(),
           projectId: selectedProjectId,
           platforms: targetPlatforms,
         }),
@@ -109,6 +154,12 @@ export default function RiskCheckPage({ params }: RiskCheckProps) {
     pass: { bg: 'bg-green-50 border-green-200', text: 'text-green-700', icon: CheckCircle2 },
   };
 
+  const canCheck = inputMode === 'video'
+    ? !!extractedText.trim()
+    : inputMode === 'text'
+      ? !!scriptText.trim()
+      : !!selectedProjectId;
+
   return (
     <>
       <Header title="配信リスクチェック" userEmail={user?.email} />
@@ -118,13 +169,20 @@ export default function RiskCheckPage({ params }: RiskCheckProps) {
             <ShieldCheck className="w-6 h-6 text-emerald-600" />
             <div>
               <h1 className="text-xl font-bold">配信リスクチェック</h1>
-              <p className="text-sm text-muted-foreground">広告配信前の最終安全チェック - コンテンツリスク・誤字脱字・媒体ポリシー準拠</p>
+              <p className="text-sm text-muted-foreground">動画ファイルをアップロードして、配信前の安全チェックを実行</p>
             </div>
           </div>
 
           {/* Input */}
           <div className="rounded-xl border border-border bg-card p-5 mb-6 space-y-4">
             <div className="flex gap-2">
+              <button
+                onClick={() => setInputMode('video')}
+                className={`px-4 py-2 text-sm rounded-lg border transition-colors flex items-center gap-1.5 ${inputMode === 'video' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-medium' : 'border-border hover:bg-muted'}`}
+              >
+                <Film className="w-3.5 h-3.5" />
+                動画アップロード
+              </button>
               <button onClick={() => setInputMode('text')} className={`px-4 py-2 text-sm rounded-lg border transition-colors ${inputMode === 'text' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-medium' : 'border-border hover:bg-muted'}`}>
                 テキスト入力
               </button>
@@ -133,7 +191,72 @@ export default function RiskCheckPage({ params }: RiskCheckProps) {
               </button>
             </div>
 
-            {inputMode === 'text' ? (
+            {inputMode === 'video' ? (
+              <div className="space-y-3">
+                {!videoFile ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-emerald-300 rounded-xl p-8 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/50 transition-all"
+                  >
+                    <Upload className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+                    <p className="text-sm font-medium text-zinc-700">動画ファイルをクリックして選択</p>
+                    <p className="text-xs text-muted-foreground mt-1">MP4, MOV, WebM, AVI（最大100MB）</p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="video/mp4,video/quicktime,video/webm,video/avi,video/x-msvideo"
+                      onChange={handleVideoSelect}
+                      className="hidden"
+                    />
+                  </div>
+                ) : (
+                  <div className="border border-emerald-200 bg-emerald-50/50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <Film className="w-5 h-5 text-emerald-600" />
+                        <div>
+                          <p className="text-sm font-medium">{videoFile.name}</p>
+                          <p className="text-xs text-muted-foreground">{(videoFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { setVideoFile(null); setExtractedText(""); }}
+                        className="p-1 rounded hover:bg-emerald-100"
+                      >
+                        <X className="w-4 h-4 text-zinc-500" />
+                      </button>
+                    </div>
+
+                    {!extractedText && (
+                      <Button
+                        onClick={handleExtractText}
+                        disabled={extracting}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        {extracting ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" />動画を解析中...（音声・テロップを抽出しています）</>
+                        ) : (
+                          <><Upload className="w-4 h-4" />動画からテキストを抽出</>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {extractedText && (
+                  <div>
+                    <label className="text-sm font-medium block mb-1.5">抽出されたテキスト（編集可能）</label>
+                    <textarea
+                      value={extractedText}
+                      onChange={e => setExtractedText(e.target.value)}
+                      className="w-full px-4 py-3 text-sm border border-border rounded-lg bg-background resize-none font-mono"
+                      rows={10}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">※ AI が抽出したテキストです。必要に応じて編集してください。</p>
+                  </div>
+                )}
+              </div>
+            ) : inputMode === 'text' ? (
               <textarea
                 value={scriptText}
                 onChange={e => setScriptText(e.target.value)}
@@ -152,7 +275,7 @@ export default function RiskCheckPage({ params }: RiskCheckProps) {
 
             <div>
               <label className="text-sm font-medium block mb-2">配信予定プラットフォーム</label>
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
                 {[
                   { key: 'meta', label: 'Meta広告' },
                   { key: 'tiktok', label: 'TikTok広告' },
@@ -173,7 +296,7 @@ export default function RiskCheckPage({ params }: RiskCheckProps) {
               </div>
             </div>
 
-            <Button onClick={handleCheck} disabled={checking} className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={handleCheck} disabled={checking || !canCheck} className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white">
               {checking ? <><Loader2 className="w-4 h-4 animate-spin" />チェック中...</> : <><ShieldCheck className="w-4 h-4" />リスクチェック実行</>}
             </Button>
           </div>
