@@ -59,6 +59,33 @@ interface Scene {
   subtitle_style: SubtitleStyle | null;
 }
 
+interface AdMetric {
+  predicted: string;
+  benchmark: string;
+  verdict: string;
+}
+
+interface CompetitorInsight {
+  insight: string;
+  source: string;
+}
+
+interface PredictionSource {
+  title?: string;
+  url: string;
+}
+
+interface AdPrediction {
+  score?: number;
+  scoreLabel?: string;
+  metrics?: Record<string, AdMetric>;
+  strengths?: string[];
+  weaknesses?: string[];
+  recommendations?: string[];
+  competitorInsights?: CompetitorInsight[];
+  sources?: PredictionSource[];
+}
+
 interface VideoProject {
   id: string;
   title: string;
@@ -71,7 +98,7 @@ interface VideoProject {
   script: { title: string; scenes: unknown[] } | null;
   pipeline_logs: string[];
   error_message: string | null;
-  ad_prediction: any | null;
+  ad_prediction: AdPrediction | null;
   scenes: Scene[];
   company_analysis: {
     companyName?: string;
@@ -138,7 +165,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
   const [generatingBGM, setGeneratingBGM] = useState(false);
   const [bgmUrl, setBgmUrl] = useState<string | null>(null);
   const [predicting, setPredicting] = useState(false);
-  const [prediction, setPrediction] = useState<any>(null);
+  const [prediction, setPrediction] = useState<AdPrediction | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -874,7 +901,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
 
               {/* Metrics Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                {prediction.metrics && Object.entries(prediction.metrics).map(([key, val]: [string, any]) => {
+                {prediction.metrics && Object.entries(prediction.metrics).map(([key, val]: [string, AdMetric]) => {
                   const labels: Record<string, string> = {
                     ctr: 'CTR', cpm: 'CPM', cpc: 'CPC', cvr: 'CVR',
                     hookRate: 'フック率', completionRate: '完視聴率', cpa: 'CPA'
@@ -939,7 +966,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                 <div className="mb-3">
                   <p className="text-xs font-semibold text-indigo-700 mb-2">競合情報</p>
                   <div className="space-y-1.5">
-                    {prediction.competitorInsights.map((c: any, i: number) => (
+                    {prediction.competitorInsights.map((c: CompetitorInsight, i: number) => (
                       <div key={i} className="text-xs bg-white rounded p-2 border border-indigo-100">
                         <p className="font-medium">{c.insight}</p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">出典: {c.source}</p>
@@ -954,7 +981,7 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                 <div className="pt-3 border-t border-indigo-200">
                   <p className="text-[10px] text-muted-foreground mb-1">参照データソース:</p>
                   <div className="flex flex-wrap gap-1">
-                    {prediction.sources.slice(0, 5).map((s: any, i: number) => (
+                    {prediction.sources.slice(0, 5).map((s: PredictionSource, i: number) => (
                       <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="text-[9px] text-indigo-500 hover:underline bg-white rounded px-1.5 py-0.5 border border-indigo-100">
                         {s.title || s.url}
                       </a>
