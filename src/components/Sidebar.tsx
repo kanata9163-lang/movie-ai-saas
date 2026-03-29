@@ -68,7 +68,7 @@ const navSections = (slug: string): NavSection[] => [
     items: [
       { label: "ナレッジベース", href: `/w/${slug}/knowledge`, icon: BookOpen },
       { label: "トレンドリサーチ", href: `/w/${slug}/trends`, icon: TrendingUp },
-      { label: "広告分析", href: `/w/${slug}/ad-research`, icon: Megaphone },
+      { label: "広告リサーチ", href: `/w/${slug}/ad-research`, icon: Megaphone },
       { label: "クリエイティブ分析", href: `/w/${slug}/creative-check`, icon: BarChart3 },
       { label: "配信リスクチェック", href: `/w/${slug}/risk-check`, icon: ShieldCheck },
     ],
