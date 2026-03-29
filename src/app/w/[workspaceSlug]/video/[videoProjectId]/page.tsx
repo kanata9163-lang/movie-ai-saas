@@ -76,14 +76,14 @@ interface PredictionSource {
 }
 
 interface AdPrediction {
-  score?: number;
-  scoreLabel?: string;
-  metrics?: Record<string, AdMetric>;
-  strengths?: string[];
-  weaknesses?: string[];
-  recommendations?: string[];
-  competitorInsights?: CompetitorInsight[];
-  sources?: PredictionSource[];
+  overallScore: number;
+  scoreLabel: string;
+  metrics: Record<string, AdMetric>;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+  competitorInsights: CompetitorInsight[];
+  sources: PredictionSource[];
 }
 
 interface VideoProject {

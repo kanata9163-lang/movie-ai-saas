@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/useUser";
-import { Loader2, BarChart3, TrendingUp, Target, Zap, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, BarChart3, Target, Zap, ChevronDown, ChevronUp } from "lucide-react";
 
 interface CreativeCheckProps {
   params: { workspaceSlug: string };
