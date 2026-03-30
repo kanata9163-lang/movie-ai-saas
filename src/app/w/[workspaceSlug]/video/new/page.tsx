@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,14 @@ interface ClientOption {
 }
 
 export default function NewVideoPage({ params }: NewVideoProps) {
+  return (
+    <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-zinc-300 border-t-zinc-900 rounded-full" /></div>}>
+      <NewVideoPageInner params={params} />
+    </Suspense>
+  );
+}
+
+function NewVideoPageInner({ params }: NewVideoProps) {
   const { workspaceSlug } = params;
   const { user } = useUser();
   const router = useRouter();
