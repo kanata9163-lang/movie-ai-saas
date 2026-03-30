@@ -405,7 +405,9 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
       const ffmpeg = new FFmpeg();
       ffmpeg.on("log", ({ message }: { message: string }) => console.log("[ffmpeg]", message));
       ffmpeg.on("progress", ({ progress }: { progress: number }) => {
-        if (progress > 0) setComposeProgress(`処理中... ${Math.round(progress * 100)}%`);
+        if (progress > 0 && progress <= 1) {
+          setComposeProgress(`処理中... ${Math.round(progress * 100)}%`);
+        }
       });
 
       // Load single-threaded core (no SharedArrayBuffer needed)
