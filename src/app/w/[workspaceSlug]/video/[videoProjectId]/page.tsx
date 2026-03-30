@@ -507,12 +507,22 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
 
       // Concatenate all scenes
       setComposeProgress("全シーンを結合中...");
-      const concatList = fileNames.map(n => `file '${n}'`).join("\n");
-      await ffmpeg.writeFile("filelist.txt", concatList);
-      await ffmpeg.exec([
-        "-f", "concat", "-safe", "0", "-i", "filelist.txt",
-        "-c", "copy", "concat.mp4"
-      ]);
+      if (fileNames.length === 1) {
+        // Single scene - just rename
+        const singleData = await ffmpeg.readFile(fileNames[0]);
+        await ffmpeg.writeFile("concat.mp4", singleData);
+      } else {
+        const concatList = fileNames.map(n => `file '${n}'`).join("\n");
+        await ffmpeg.writeFile("filelist.txt", concatList);
+        // Re-encode to ensure consistent format across all scenes
+        await ffmpeg.exec([
+          "-f", "concat", "-safe", "0", "-i", "filelist.txt",
+          "-c:v", "libx264", "-preset", "ultrafast",
+          "-c:a", "aac",
+          "-movflags", "+faststart",
+          "concat.mp4"
+        ]);
+      }
 
       // Mix BGM if available
       let finalFile = "concat.mp4";
@@ -548,11 +558,20 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
         }
       }
 
-      const data = await ffmpeg.readFile(finalFile);
-      const blob = new Blob([new Uint8Array(data as unknown as ArrayBuffer)], { type: "video/mp4" });
+      const rawData = await ffmpeg.readFile(finalFile);
+      const bytes = rawData instanceof Uint8Array ? rawData : new TextEncoder().encode(rawData as string);
+      const blob = new Blob([bytes as BlobPart], { type: "video/mp4" });
       const url = URL.createObjectURL(blob);
       setFinalVideoUrl(url);
-      setComposeProgress("完了！");
+      setComposeProgress("完了！ダウンロードを開始します...");
+
+      // Auto-download
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${project.title || "video"}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
 
       // Cleanup
       for (const name of fileNames) await ffmpeg.deleteFile(name).catch(() => {});
