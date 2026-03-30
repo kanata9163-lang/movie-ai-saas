@@ -1,16 +1,15 @@
 /**
  * BytePlus ModelArk - Seedance 1.5 Pro (Video Generation)
- * Replaces Runway ML for image-to-video generation
+ * Image-to-video generation via ModelArk Content Generation API
  *
  * API Docs: https://docs.byteplus.com/en/docs/ModelArk/1520757
- * Region: Asia Pacific (ap-southeast-1)
+ * Region: Asia Pacific (ap-southeast)
  */
 
-const BYTEPLUS_API_URL = 'https://ark.ap-southeast-1.byteplusapi.com/api/v3/contents/generations/tasks';
+const BYTEPLUS_API_URL = 'https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks';
 
 // Model name for Seedance 1.5 Pro
-// Falls back to env var for custom endpoint IDs
-const SEEDANCE_MODEL = process.env.BYTEPLUS_SEEDANCE_MODEL || 'doubao-seedance-1-5-pro-251215';
+const SEEDANCE_MODEL = process.env.BYTEPLUS_SEEDANCE_MODEL || 'seedance-1-5-pro-251215';
 
 export async function createVideoFromImage(
   imageUrl: string,
@@ -32,13 +31,14 @@ export async function createVideoFromImage(
   // Seedance 1.5 supports 2-12 seconds
   const duration = Math.max(2, Math.min(durationSeconds, 12));
 
-  // Build content array for image-to-video (first-frame image + text prompt)
+  // Build content array: first_frame image + text prompt
   const content: Array<Record<string, unknown>> = [
     {
       type: 'image_url',
       image_url: {
         url: imageUrl,
       },
+      role: 'first_frame',
     },
   ];
 
@@ -77,8 +77,9 @@ export async function createVideoFromImage(
   }
 
   const result = await response.json();
-  console.log(`[Seedance] Task created: ${result.id}`);
-  return result.id;
+  const taskId = result.id || result.task_id;
+  console.log(`[Seedance] Task created: ${taskId}`);
+  return taskId;
 }
 
 export async function checkTaskStatus(taskId: string): Promise<{
@@ -104,8 +105,11 @@ export async function checkTaskStatus(taskId: string): Promise<{
   const task = await response.json();
 
   // Seedance status values: queued, running, succeeded, failed, expired, cancelled
-  if (task.status === 'succeeded' && task.content?.video_url) {
-    return { status: 'SUCCEEDED', outputUrl: task.content.video_url };
+  if (task.status === 'succeeded') {
+    const videoUrl = task.content?.video_url || task.output?.video_url;
+    if (videoUrl) {
+      return { status: 'SUCCEEDED', outputUrl: videoUrl };
+    }
   }
   if (task.status === 'failed') {
     return { status: 'FAILED', error: task.error?.message || task.error?.code || 'Unknown error' };
