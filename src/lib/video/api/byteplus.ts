@@ -28,8 +28,8 @@ export async function createVideoFromImage(
   };
   const ratio = ratioMap[aspectRatio] || '9:16';
 
-  // Seedance 1.5 supports 2-12 seconds
-  const duration = Math.max(2, Math.min(durationSeconds, 12));
+  // Seedance 1.5 Pro i2v supports 4-12 seconds
+  const duration = Math.max(4, Math.min(durationSeconds, 12));
 
   // Build content array: first_frame image + text prompt
   const content: Array<Record<string, unknown>> = [
