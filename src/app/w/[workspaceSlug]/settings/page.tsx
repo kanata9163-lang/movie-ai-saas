@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useUser } from "@/lib/useUser";
 import { Settings, Users, Link2, Loader2, Trash2, Copy, Check, MessageSquare, Zap, Send, Coins, CreditCard, ArrowDownRight, ArrowUpRight } from "lucide-react";
 import LoadingAnimation from "@/components/LoadingAnimation";
-import { CREDIT_COSTS } from "@/lib/stripe";
+import { CREDIT_COSTS } from "@/lib/stripe-constants";
 
 interface SettingsPageProps {
   params: { workspaceSlug: string };

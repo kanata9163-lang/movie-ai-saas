@@ -37,31 +37,37 @@ export async function POST(req: NextRequest) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://vid-harness.vercel.app';
 
-  const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: 'payment',
-    payment_method_types: ['card'],
-    line_items: [
-      {
-        price_data: {
-          currency: 'jpy',
-          unit_amount: priceInYen,
-          product_data: {
-            name: `${creditAmount} クレジット`,
-            description: `Vid Harness クレジット購入（1クレジット = ¥${CREDIT_PRICE_YEN}）`,
+  try {
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'jpy',
+            unit_amount: priceInYen,
+            product_data: {
+              name: `${creditAmount} クレジット`,
+              description: `Vid Harness クレジット購入（1クレジット = ¥${CREDIT_PRICE_YEN}）`,
+            },
           },
+          quantity: 1,
         },
-        quantity: 1,
+      ],
+      metadata: {
+        workspace_id: workspaceId,
+        user_id: user.id,
+        credits: String(creditAmount),
       },
-    ],
-    metadata: {
-      workspace_id: workspaceId,
-      user_id: user.id,
-      credits: String(creditAmount),
-    },
-    success_url: `${appUrl}/w/${workspaceSlug}/settings?payment=success&credits=${creditAmount}`,
-    cancel_url: `${appUrl}/w/${workspaceSlug}/settings?payment=cancelled`,
-  });
+      success_url: `${appUrl}/w/${workspaceSlug}/settings?payment=success&credits=${creditAmount}`,
+      cancel_url: `${appUrl}/w/${workspaceSlug}/settings?payment=cancelled`,
+    });
 
-  return NextResponse.json({ ok: true, data: { url: session.url } });
+    return NextResponse.json({ ok: true, data: { url: session.url } });
+  } catch (err) {
+    console.error('Stripe checkout error:', err);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ ok: false, error: `Stripe エラー: ${message}` }, { status: 500 });
+  }
 }
