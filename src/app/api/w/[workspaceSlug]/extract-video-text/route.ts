@@ -3,6 +3,19 @@ import { getWorkspaceWithAuth, errorResponse } from '@/lib/api-helpers';
 
 export const maxDuration = 120;
 
+// Step 1: Client calls GET to get upload URL info
+export async function GET(req: NextRequest, { params }: { params: { workspaceSlug: string } }) {
+  const auth = await getWorkspaceWithAuth(params.workspaceSlug, req);
+  if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return errorResponse('config', 'GEMINI_API_KEY not set', 500);
+
+  // Return the API key for client-side upload (scoped to this workspace member)
+  return NextResponse.json({ ok: true, data: { apiKey } });
+}
+
+// Step 2: Client uploads video to Gemini directly, then calls POST with fileUri
 export async function POST(req: NextRequest, { params }: { params: { workspaceSlug: string } }) {
   const auth = await getWorkspaceWithAuth(params.workspaceSlug, req);
   if (!auth) return errorResponse('forbidden', 'Not a workspace member', 403);
@@ -10,60 +23,30 @@ export async function POST(req: NextRequest, { params }: { params: { workspaceSl
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return errorResponse('config', 'GEMINI_API_KEY not set', 500);
 
-  const formData = await req.formData();
-  const file = formData.get('video') as File | null;
-  if (!file) return errorResponse('validation', '動画ファイルが必要です', 400);
+  const { fileUri, mimeType, fileName } = await req.json();
+  if (!fileUri) return errorResponse('validation', 'fileUri is required', 400);
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const mimeType = file.type || 'video/mp4';
-
-  // Step 1: Upload file to Gemini File API
-  const uploadRes = await fetch(
-    `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: {
-        'X-Goog-Upload-Command': 'upload, finalize',
-        'X-Goog-Upload-Header-Content-Length': String(buffer.length),
-        'X-Goog-Upload-Header-Content-Type': mimeType,
-        'Content-Type': mimeType,
-      },
-      body: buffer,
+  // Wait for file to be processed (poll until ACTIVE)
+  if (fileName) {
+    let fileState = 'PROCESSING';
+    let attempts = 0;
+    while (fileState === 'PROCESSING' && attempts < 30) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const statusRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`
+      );
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        fileState = statusData.state;
+      }
+      attempts++;
     }
-  );
-
-  if (!uploadRes.ok) {
-    const err = await uploadRes.text();
-    return NextResponse.json({ ok: false, error: `ファイルアップロードに失敗: ${err}` }, { status: 500 });
-  }
-
-  const uploadResult = await uploadRes.json();
-  const fileUri = uploadResult.file?.uri;
-  if (!fileUri) {
-    return NextResponse.json({ ok: false, error: 'ファイルURIの取得に失敗しました' }, { status: 500 });
-  }
-
-  // Step 2: Wait for file to be processed (poll until ACTIVE)
-  const fileName = uploadResult.file?.name;
-  let fileState = uploadResult.file?.state;
-  let attempts = 0;
-  while (fileState === 'PROCESSING' && attempts < 30) {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    const statusRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`
-    );
-    if (statusRes.ok) {
-      const statusData = await statusRes.json();
-      fileState = statusData.state;
+    if (fileState !== 'ACTIVE') {
+      return NextResponse.json({ ok: false, error: '動画の処理がタイムアウトしました' }, { status: 500 });
     }
-    attempts++;
   }
 
-  if (fileState !== 'ACTIVE') {
-    return NextResponse.json({ ok: false, error: '動画の処理がタイムアウトしました' }, { status: 500 });
-  }
-
-  // Step 3: Ask Gemini to extract all text from the video
+  // Ask Gemini to extract all text from the video
   const extractPrompt = `この動画を分析して、以下の情報をすべてテキストとして抽出してください。
 
 1. **音声書き起こし**: 動画内で話されている全ての音声をそのまま書き起こしてください
@@ -89,7 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: { workspaceSl
       body: JSON.stringify({
         contents: [{
           parts: [
-            { fileData: { fileUri, mimeType } },
+            { fileData: { fileUri, mimeType: mimeType || 'video/mp4' } },
             { text: extractPrompt },
           ],
         }],
@@ -99,9 +82,11 @@ export async function POST(req: NextRequest, { params }: { params: { workspaceSl
   );
 
   // Clean up uploaded file (fire and forget)
-  fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`, {
-    method: 'DELETE',
-  }).catch(() => {});
+  if (fileName) {
+    fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+  }
 
   if (!genRes.ok) {
     const err = await genRes.text();

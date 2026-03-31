@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/useUser";
 import { Loader2, ShieldCheck, AlertTriangle, CheckCircle2, XCircle, FileWarning, Type, Eye, Scale, Upload, Film, X } from "lucide-react";
+import { extractVideoText } from "@/lib/extract-video-client";
 
 interface RiskCheckProps {
   params: { workspaceSlug: string };
@@ -77,26 +78,19 @@ export default function RiskCheckPage({ params }: RiskCheckProps) {
     }
   };
 
+  const [extractProgress, setExtractProgress] = useState("");
+
   const handleExtractText = async () => {
     if (!videoFile) return;
     setExtracting(true);
     try {
-      const formData = new FormData();
-      formData.append('video', videoFile);
-      const res = await fetch(`/api/w/${workspaceSlug}/extract-video-text`, {
-        method: 'POST',
-        body: formData,
-      });
-      const json = await res.json();
-      if (json.ok) {
-        setExtractedText(json.data.extractedText);
-      } else {
-        alert(json.error || 'テキスト抽出に失敗しました');
-      }
-    } catch {
-      alert('テキスト抽出に失敗しました');
+      const text = await extractVideoText(workspaceSlug, videoFile, setExtractProgress);
+      setExtractedText(text);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'テキスト抽出に失敗しました');
     } finally {
       setExtracting(false);
+      setExtractProgress("");
     }
   };
 
@@ -234,7 +228,7 @@ export default function RiskCheckPage({ params }: RiskCheckProps) {
                         className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                       >
                         {extracting ? (
-                          <><Loader2 className="w-4 h-4 animate-spin" />動画を解析中...（音声・テロップを抽出しています）</>
+                          <><Loader2 className="w-4 h-4 animate-spin" />{extractProgress || '処理中...'}</>
                         ) : (
                           <><Upload className="w-4 h-4" />動画からテキストを抽出</>
                         )}
