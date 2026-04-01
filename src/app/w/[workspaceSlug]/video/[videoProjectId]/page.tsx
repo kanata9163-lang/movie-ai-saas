@@ -29,6 +29,7 @@ import {
   BookOpen,
   Quote,
   TrendingUp,
+  Package,
 } from "lucide-react";
 import ShareButton from "@/components/ShareButton";
 
@@ -166,6 +167,8 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
   const [bgmUrl, setBgmUrl] = useState<string | null>(null);
   const [predicting, setPredicting] = useState(false);
   const [prediction, setPrediction] = useState<AdPrediction | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState("");
   const logsEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -648,6 +651,169 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
     }
   };
 
+  const handleExportAll = async () => {
+    if (!project) return;
+    setExporting(true);
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      const title = project.title || "video_project";
+
+      // 1. 台本（スクリプト）をテキストで出力
+      setExportProgress("台本を作成中...");
+      const sortedScenes = [...project.scenes].sort((a, b) => a.scene_number - b.scene_number);
+      let scriptText = `# ${title}\n`;
+      scriptText += `作成日: ${new Date().toLocaleDateString("ja-JP")}\n`;
+      scriptText += `アスペクト比: ${project.aspect_ratio}\n`;
+      scriptText += `ナレーション: ${project.voice_type === 'female' ? '女性' : '男性'}（${project.voice_style}）\n`;
+      if (project.source_url) scriptText += `参照URL: ${project.source_url}\n`;
+      if (project.custom_instructions) scriptText += `カスタム指示: ${project.custom_instructions}\n`;
+      scriptText += `\n---\n\n`;
+
+      for (const scene of sortedScenes) {
+        scriptText += `## シーン ${scene.scene_number}（${Math.round(Number(scene.duration))}秒）\n\n`;
+        if (scene.description) scriptText += `【シーン説明】\n${scene.description}\n\n`;
+        if (scene.narration_text) scriptText += `【ナレーション】\n${scene.narration_text}\n\n`;
+        if (scene.subtitle_text) scriptText += `【字幕テロップ】\n${scene.subtitle_text}\n\n`;
+        if (scene.image_prompt) scriptText += `【画像プロンプト】\n${scene.image_prompt}\n\n`;
+        scriptText += `---\n\n`;
+      }
+
+      // 会社分析情報も含める
+      if (project.company_analysis) {
+        const ca = project.company_analysis;
+        scriptText += `\n## 分析情報\n\n`;
+        if (ca.companyName) scriptText += `会社名: ${ca.companyName}\n`;
+        if (ca.industry) scriptText += `業界: ${ca.industry}\n`;
+        if (ca.targetAudience) scriptText += `ターゲット: ${ca.targetAudience}\n`;
+        if (ca.tone) scriptText += `トーン: ${ca.tone}\n`;
+        if (ca.keyMessages?.length) scriptText += `キーメッセージ:\n${ca.keyMessages.map(m => `  - ${m}`).join('\n')}\n`;
+        if (ca.citations?.length) {
+          scriptText += `\n### 引用情報\n`;
+          for (const c of ca.citations) {
+            scriptText += `- ${c.fact}（出典: ${c.source}）\n`;
+          }
+        }
+        if (ca.marketInsights?.length) {
+          scriptText += `\n### 市場インサイト\n`;
+          for (const m of ca.marketInsights) {
+            scriptText += `- ${m.insight}（根拠: ${m.basis}）\n`;
+          }
+        }
+      }
+
+      zip.file("台本.txt", scriptText);
+
+      // 2. 画像をダウンロードしてZIPに追加
+      const scenesWithImages = sortedScenes.filter(s => s.image_url);
+      if (scenesWithImages.length > 0) {
+        const imgFolder = zip.folder("画像");
+        for (let i = 0; i < scenesWithImages.length; i++) {
+          const scene = scenesWithImages[i];
+          setExportProgress(`画像ダウンロード中... (${i + 1}/${scenesWithImages.length})`);
+          try {
+            const resp = await fetch(scene.image_url!);
+            if (resp.ok) {
+              const blob = await resp.blob();
+              const ext = blob.type.includes("png") ? "png" : "jpg";
+              imgFolder!.file(`シーン${scene.scene_number}.${ext}`, blob);
+            }
+          } catch {
+            console.warn(`画像DL失敗: シーン${scene.scene_number}`);
+          }
+        }
+      }
+
+      // 3. 音声をダウンロードしてZIPに追加
+      const scenesWithAudio = sortedScenes.filter(s => s.audio_url);
+      if (scenesWithAudio.length > 0) {
+        const audioFolder = zip.folder("ナレーション");
+        for (let i = 0; i < scenesWithAudio.length; i++) {
+          const scene = scenesWithAudio[i];
+          setExportProgress(`ナレーション音声ダウンロード中... (${i + 1}/${scenesWithAudio.length})`);
+          try {
+            const resp = await fetch(proxyUrl(scene.id, 'audio'));
+            if (resp.ok) {
+              const blob = await resp.blob();
+              audioFolder!.file(`シーン${scene.scene_number}_ナレーション.mp3`, blob);
+            }
+          } catch {
+            console.warn(`音声DL失敗: シーン${scene.scene_number}`);
+          }
+        }
+      }
+
+      // 4. 動画をダウンロードしてZIPに追加
+      const scenesWithVideo = sortedScenes.filter(s => s.video_url);
+      if (scenesWithVideo.length > 0) {
+        const videoFolder = zip.folder("動画");
+        for (let i = 0; i < scenesWithVideo.length; i++) {
+          const scene = scenesWithVideo[i];
+          setExportProgress(`動画ダウンロード中... (${i + 1}/${scenesWithVideo.length})`);
+          try {
+            const resp = await fetch(proxyUrl(scene.id));
+            if (resp.ok) {
+              const blob = await resp.blob();
+              videoFolder!.file(`シーン${scene.scene_number}.mp4`, blob);
+            }
+          } catch {
+            console.warn(`動画DL失敗: シーン${scene.scene_number}`);
+          }
+        }
+      }
+
+      // 5. 広告パフォーマンス予測があれば追加
+      if (prediction) {
+        let predText = `# 広告パフォーマンス予測\n\n`;
+        predText += `総合スコア: ${prediction.overallScore}/100 (${prediction.scoreLabel})\n\n`;
+        if (prediction.metrics) {
+          predText += `## 指標予測\n`;
+          for (const [key, val] of Object.entries(prediction.metrics)) {
+            predText += `- ${key}: ${val.predicted}（業界平均: ${val.benchmark}）\n`;
+          }
+          predText += `\n`;
+        }
+        if (prediction.strengths?.length) {
+          predText += `## 強み\n${prediction.strengths.map(s => `- ${s}`).join('\n')}\n\n`;
+        }
+        if (prediction.weaknesses?.length) {
+          predText += `## 改善点\n${prediction.weaknesses.map(w => `- ${w}`).join('\n')}\n\n`;
+        }
+        if (prediction.recommendations?.length) {
+          predText += `## 改善提案\n${prediction.recommendations.map(r => `- ${r}`).join('\n')}\n\n`;
+        }
+        zip.file("広告パフォーマンス予測.txt", predText);
+      }
+
+      // 6. ZIPを生成してダウンロード
+      setExportProgress("ZIPファイルを生成中...");
+      const zipBlob = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: { level: 6 },
+      }, (metadata) => {
+        setExportProgress(`ZIP作成中... ${Math.round(metadata.percent)}%`);
+      });
+
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${title}_素材一式.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setExportProgress("エクスポート完了！");
+      setTimeout(() => setExportProgress(""), 3000);
+    } catch (e) {
+      console.error("Export error:", e);
+      alert("エクスポートに失敗しました: " + (e instanceof Error ? e.message : String(e)));
+      setExportProgress("");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading || !project) {
     return (
       <>
@@ -842,6 +1008,13 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                 </>
               );
             })()}
+            {/* Export button when scenes exist but no video yet */}
+            {project.scenes.length > 0 && !project.scenes.some(s => s.video_url) && (
+              <Button onClick={handleExportAll} disabled={exporting} className="bg-teal-600 text-white hover:bg-teal-700 h-11 px-6">
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                台本・画像をエクスポート（ZIP）
+              </Button>
+            )}
             {project.scenes.some(s => s.video_url) && !project.scenes.some(s => s.audio_url) && project.status !== 'generating_audio' && (
               <Button onClick={() => runAction('generate-audio')} disabled={actionLoading} className="bg-orange-600 text-white hover:bg-orange-700 h-11 px-6">
                 {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
@@ -866,6 +1039,10 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
                   <Download className="w-4 h-4" />
                   個別ダウンロード
                 </Button>
+                <Button onClick={handleExportAll} disabled={exporting} className="bg-teal-600 text-white hover:bg-teal-700 h-11 px-6">
+                  {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                  素材一括エクスポート（ZIP）
+                </Button>
               </>
             )}
             {bgmUrl && (
@@ -877,6 +1054,9 @@ export default function VideoDetailPage({ params }: VideoDetailProps) {
             )}
             {composing && composeProgress && (
               <span className="text-sm text-blue-600 self-center">{composeProgress}</span>
+            )}
+            {exporting && exportProgress && (
+              <span className="text-sm text-teal-600 self-center">{exportProgress}</span>
             )}
           </div>
 
