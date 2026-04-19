@@ -35,7 +35,24 @@ export async function POST(req: NextRequest) {
 
   const priceInYen = creditAmount * CREDIT_PRICE_YEN;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://vid-harness.vercel.app';
+  const envAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const isValidHttpsUrl = (u: string | undefined): u is string => {
+    if (!u) return false;
+    try {
+      const parsed = new URL(u);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    } catch {
+      return false;
+    }
+  };
+  const appUrl = isValidHttpsUrl(envAppUrl) ? envAppUrl : req.nextUrl.origin;
+
+  if (!workspaceSlug) {
+    return NextResponse.json(
+      { ok: false, error: 'workspaceSlug が指定されていません' },
+      { status: 400 }
+    );
+  }
 
   try {
     const stripe = getStripe();
