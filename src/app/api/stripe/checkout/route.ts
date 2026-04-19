@@ -35,17 +35,18 @@ export async function POST(req: NextRequest) {
 
   const priceInYen = creditAmount * CREDIT_PRICE_YEN;
 
-  const envAppUrl = process.env.NEXT_PUBLIC_APP_URL;
-  const isValidHttpsUrl = (u: string | undefined): u is string => {
-    if (!u) return false;
+  const envAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const normalizeOrigin = (u: string | undefined): string | null => {
+    if (!u) return null;
     try {
       const parsed = new URL(u);
-      return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+      return parsed.origin;
     } catch {
-      return false;
+      return null;
     }
   };
-  const appUrl = isValidHttpsUrl(envAppUrl) ? envAppUrl : req.nextUrl.origin;
+  const appUrl = normalizeOrigin(envAppUrl) ?? req.nextUrl.origin;
 
   if (!workspaceSlug) {
     return NextResponse.json(
