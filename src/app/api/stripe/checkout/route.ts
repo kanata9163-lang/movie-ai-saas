@@ -11,7 +11,6 @@ export async function POST(req: NextRequest) {
 
   const { credits, workspaceId, workspaceSlug } = await req.json();
 
-  // Validate
   const creditAmount = parseInt(credits);
   if (!creditAmount || creditAmount < 100 || creditAmount > 100000) {
     return NextResponse.json(
@@ -20,7 +19,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Verify user is member of workspace
+  if (!workspaceSlug) {
+    return NextResponse.json(
+      { ok: false, error: 'workspaceSlug が指定されていません' },
+      { status: 400 }
+    );
+  }
+
   const db = createServerClient();
   const { data: membership } = await db
     .from('workspace_members')
@@ -48,36 +53,6 @@ export async function POST(req: NextRequest) {
   };
   const appUrl = normalizeOrigin(envAppUrl) ?? req.nextUrl.origin;
 
-  if (!workspaceSlug) {
-    return NextResponse.json(
-      { ok: false, error: 'workspaceSlug が指定されていません' },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const stripe = getStripe();
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'jpy',
-            unit_amount: priceInYen,
-            product_data: {
-              name: `${creditAmount} クレジット`,
-              description: `Vid Harness クレジット購入（1クレジット = ¥${CREDIT_PRICE_YEN}）`,
-            },
-          },
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        workspace_id: workspaceId,
-        user_id: user.id,
-        credits: String(creditAmount),
-      },
   const successUrl = `${appUrl}/w/${encodeURIComponent(workspaceSlug)}/settings?payment=success&credits=${creditAmount}`;
   const cancelUrl = `${appUrl}/w/${encodeURIComponent(workspaceSlug)}/settings?payment=cancelled`;
 
