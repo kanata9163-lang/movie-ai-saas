@@ -1,18 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Film, Loader2 } from "lucide-react";
+import { Film, Loader2, Mail } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,17 +28,39 @@ export default function SignupPage() {
       if (!json.ok) {
         throw new Error(json.error?.message || "登録に失敗しました");
       }
-      const slug = json.data?.workspaceSlug;
-      if (!slug) {
-        throw new Error("ワークスペースの作成に失敗しました。もう一度お試しください。");
-      }
-      router.push(`/w/${slug}`);
+      setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "登録に失敗しました");
     } finally {
       setLoading(false);
     }
   };
+
+  if (sent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-sm space-y-6 text-center">
+          <div className="w-12 h-12 bg-zinc-950 rounded-xl flex items-center justify-center mx-auto">
+            <Mail className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold">確認メールを送信しました</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              <span className="font-medium">{email}</span> 宛に確認メールをお送りしました。
+              <br />
+              メール内のリンクをクリックして登録を完了してください。
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            メールが届かない場合は迷惑メールフォルダをご確認ください。
+          </p>
+          <Link href="/login" className="text-sm text-foreground hover:underline font-medium inline-block">
+            ログイン画面へ
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -82,7 +103,7 @@ export default function SignupPage() {
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "登録する"}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "確認メールを送信"}
           </Button>
         </form>
 
