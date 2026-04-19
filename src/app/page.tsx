@@ -10,5 +10,5 @@ export default function Home() {
     redirect("/w/demo");
   }
 
-  redirect("/login");
+  redirect("/signup");
 }
