@@ -77,14 +77,45 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         credits: String(creditAmount),
       },
-      success_url: `${appUrl}/w/${workspaceSlug}/settings?payment=success&credits=${creditAmount}`,
-      cancel_url: `${appUrl}/w/${workspaceSlug}/settings?payment=cancelled`,
+  const successUrl = `${appUrl}/w/${encodeURIComponent(workspaceSlug)}/settings?payment=success&credits=${creditAmount}`;
+  const cancelUrl = `${appUrl}/w/${encodeURIComponent(workspaceSlug)}/settings?payment=cancelled`;
+
+  console.log('Stripe checkout URLs:', { appUrl, successUrl, cancelUrl, envAppUrl, workspaceSlug });
+
+  try {
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'jpy',
+            unit_amount: priceInYen,
+            product_data: {
+              name: `${creditAmount} クレジット`,
+              description: `Vid Harness クレジット購入（1クレジット = ¥${CREDIT_PRICE_YEN}）`,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: {
+        workspace_id: workspaceId,
+        user_id: user.id,
+        credits: String(creditAmount),
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
     });
 
     return NextResponse.json({ ok: true, data: { url: session.url } });
   } catch (err) {
-    console.error('Stripe checkout error:', err);
+    console.error('Stripe checkout error:', err, { successUrl, cancelUrl, appUrl, envAppUrl });
     const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ ok: false, error: `Stripe エラー: ${message}` }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: `Stripe エラー: ${message} (success_url=${successUrl})` },
+      { status: 500 }
+    );
   }
 }
